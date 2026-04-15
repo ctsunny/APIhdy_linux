@@ -40,7 +40,7 @@ check_os() {
         echo -e "${RED}错误：无法识别操作系统！${NC}"
         exit 1
     fi
-    # shellcheck disable=SC1091
+    # shellcheck disable=SC1091  # /etc/os-release 是系统运行时文件，静态分析无法预读
     . /etc/os-release
     if [[ "$ID" != "ubuntu" && "$ID" != "debian" ]]; then
         echo -e "${YELLOW}警告：当前系统为 ${PRETTY_NAME}${NC}"
@@ -51,7 +51,7 @@ check_os() {
     fi
 }
 
-# 随机字母数字字符串
+# 随机字母数字字符串（/dev/urandom 适合生成管理凭证，如需更高安全性可改用 openssl rand）
 gen_str() {
     local len=${1:-8}
     tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c "$len"

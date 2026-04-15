@@ -4,6 +4,7 @@
 # 依赖：Python 3.6+ 标准库（无需额外安装）
 
 import base64
+import binascii
 import json
 import os
 import sys
@@ -54,7 +55,8 @@ class APIhdyHandler(SimpleHTTPRequestHandler):
             decoded = base64.b64decode(auth[6:]).decode('utf-8')
             user, _, pwd = decoded.partition(':')
             return user == USERNAME and pwd == PASSWORD
-        except Exception:
+        except (binascii.Error, UnicodeDecodeError):
+            # 无效的 Base64 编码或非 UTF-8 字符视为认证失败
             return False
 
     def _request_auth(self):
@@ -161,6 +163,7 @@ if __name__ == '__main__':
     print()
 
     httpd = HTTPServer(('0.0.0.0', PORT), APIhdyHandler)
+    # 监听全部网卡，请确保服务器防火墙已限制不必要的 IP 访问（见 README 故障排查）
     print('  服务已启动，按 Ctrl+C 停止\n')
     try:
         httpd.serve_forever()
