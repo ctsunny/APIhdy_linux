@@ -86,7 +86,8 @@ class APIhdyHandler(SimpleHTTPRequestHandler):
             return super().do_GET()
 
         # 无面板路径时，根路径直接服务（开发/无路径保护模式）
-        if not PANEL_PATH and (raw_path == '/' or raw_path == ''):
+        # 有面板路径时，根路径用于面板内部导航刷新（前端 replaceState 后需支持）
+        if raw_path == '/' or raw_path == '':
             if not self._check_basic_auth():
                 self._request_auth()
                 return

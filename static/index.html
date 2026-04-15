@@ -5,6 +5,12 @@
     <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>🦊 狐蒂云极速秒杀系统 V5.0 (Supreme Edition)</title>
+    <!-- URL 规范化：Vue Router 使用 '/' 作为基础路径，面板路径需在路由初始化前重置 -->
+    <script>
+      if (location.pathname !== '/') {
+        history.replaceState(null, document.title, '/');
+      }
+    </script>
     <!-- 原始站点逻辑 -->
     <script type="module" crossorigin src="/assets/index-v5.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-v5.css">
