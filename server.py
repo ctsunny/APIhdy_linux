@@ -85,8 +85,12 @@ class APIhdyHandler(SimpleHTTPRequestHandler):
         if raw_path.startswith('/assets/') or raw_path == '/favicon.ico':
             return super().do_GET()
 
-        # 无面板路径时，根路径直接服务（开发/无路径保护模式）
-        if not PANEL_PATH and (raw_path == '/' or raw_path == ''):
+        # 根路径处理：
+        # 1. 未设置面板路径时的直接访问（开发/无路径保护模式）
+        # 2. 设置了面板路径时，前端 index.html 中的 history.replaceState('/') 会将
+        #    浏览器 URL 从面板路径改为 '/'，此处确保刷新页面时仍能正常加载应用。
+        #    两种情况均需通过 Basic Auth 认证，安全策略不变。
+        if raw_path == '/' or raw_path == '':
             if not self._check_basic_auth():
                 self._request_auth()
                 return
