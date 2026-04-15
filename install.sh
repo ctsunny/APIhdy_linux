@@ -23,7 +23,7 @@ SERVICE_FILE="/etc/systemd/system/${APP_NAME}.service"
 CONFIG_FILE="${INSTALL_DIR}/config.json"
 LOG_FILE="/var/log/apihdy.log"
 SHORTCUT="/usr/local/bin/apihdy"
-GITHUB_RAW="https://raw.githubusercontent.com/ctsunny/APIhdy_linux/main"
+GITHUB_RAW="https://raw.githubusercontent.com/ctsunny/APIhdy_linux/master"
 
 # ── 工具函数 ──────────────────────────────────────────────────────────────────
 

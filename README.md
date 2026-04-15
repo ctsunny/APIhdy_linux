@@ -41,13 +41,13 @@
 ### 方法一：推荐（通过 curl）
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/ctsunny/APIhdy_linux/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/ctsunny/APIhdy_linux/master/install.sh)
 ```
 
 ### 方法二：手动下载后运行
 
 ```bash
-wget -O install.sh https://raw.githubusercontent.com/ctsunny/APIhdy_linux/main/install.sh
+wget -O install.sh https://raw.githubusercontent.com/ctsunny/APIhdy_linux/master/install.sh
 chmod +x install.sh
 bash install.sh
 ```
@@ -169,7 +169,7 @@ apihdy
 或者直接重新下载最新脚本后执行：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/ctsunny/APIhdy_linux/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/ctsunny/APIhdy_linux/master/install.sh)
 # 选择 3 - 无损升级
 ```
 
