@@ -1,7 +1,7 @@
 # APIhdy V5 Native Supreme Server
 $host.UI.RawUI.WindowTitle = "APIhdy V5 Supreme Server"
 
-$StaticDir = Join-Path $PSScriptRoot "static"
+$StaticDir = Join-Path $PSScriptRoot "static"   # windows\static\ (已移入 windows 目录)
 $TargetBase = "https://www.szhdy.com"
 $ListenUrl = "http://127.0.0.1:8080/"
 
