@@ -253,6 +253,94 @@
       }
       @keyframes spin { to { transform: rotate(360deg); } }
 
+      /* ── 标签导航 ──────────────────────────────────────── */
+      .v5-tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 14px;
+        background: rgba(0,0,0,0.04);
+        border-radius: 14px;
+        padding: 4px;
+      }
+      .v5-tab {
+        flex: 1;
+        text-align: center;
+        padding: 6px 4px;
+        font-size: 11px;
+        font-weight: 700;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: var(--text-muted);
+        user-select: none;
+      }
+      .v5-tab.active {
+        background: #fff;
+        color: var(--primary);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+      }
+      .v5-pane { display: none; }
+      .v5-pane.active { display: block; }
+
+      /* ── 任务日志 ──────────────────────────────────────── */
+      #task-log-box {
+        background: #0f172a;
+        color: #94a3b8;
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-size: 10px;
+        font-family: 'Courier New', monospace;
+        max-height: 120px;
+        overflow-y: auto;
+        margin-top: 8px;
+        line-height: 1.6;
+      }
+      #task-log-box:empty::before { content: '暂无日志...'; opacity: 0.4; }
+
+      /* ── 任务状态徽章 ──────────────────────────────────── */
+      .task-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 8px;
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .badge-running  { background: rgba(16,185,129,.15); color: #10b981; }
+      .badge-stopped  { background: rgba(100,116,139,.12); color: #64748b; }
+      .badge-success  { background: rgba(16,185,129,.15); color: #10b981; }
+      .badge-error    { background: rgba(239,68,68,.15);  color: #ef4444; }
+      .badge-timeout  { background: rgba(245,158,11,.15); color: #f59e0b; }
+      .badge-pending  { background: rgba(59,130,246,.12); color: #3b82f6; }
+
+      /* ── 设置 textarea / 小输入 ─────────────────────────── */
+      .ai-input-sm {
+        flex: 1;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        color: #0f172a;
+        padding: 6px 10px;
+        border-radius: 10px;
+        font-size: 12px;
+        outline: none;
+        transition: all 0.2s;
+        min-width: 0;
+      }
+      .ai-input-sm:focus { border-color: var(--primary); }
+
+      .settings-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+      }
+      .settings-label {
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-muted);
+        min-width: 52px;
+      }
+
       #stop-loop-banner {
         display: none;
         background: linear-gradient(90deg, #991b1b, #ef4444);
@@ -284,46 +372,183 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:8px;">
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
           </svg>
-          账号 · 通知 · 循环购买
+          极速秒杀 V5 Supreme
         </span>
         <span id="v4-indicator" style="font-size:10px; opacity:0.8;">
           <span class="status-dot dot-idle"></span>待机
         </span>
       </h3>
 
-      <!-- 账号体系 -->
-      <div class="ai-section">
-        <span class="ai-label">Account 🔐</span>
-        <div class="ai-input-group">
-          <select id="acc-list" class="ai-select">
-            <option value="">快速切换账号</option>
-          </select>
+      <!-- 标签导航 -->
+      <div class="v5-tabs">
+        <div class="v5-tab active" data-tab="account">🔐 账号</div>
+        <div class="v5-tab" data-tab="task">⚡ 服务器任务</div>
+        <div class="v5-tab" data-tab="settings">⚙️ 设置</div>
+      </div>
+
+      <!-- ── 账号面板 ── -->
+      <div class="v5-pane active" id="pane-account">
+        <div class="ai-section">
+          <span class="ai-label">Account 🔐</span>
+          <div class="ai-input-group">
+            <select id="acc-list" class="ai-select">
+              <option value="">快速切换账号</option>
+            </select>
+          </div>
+          <div class="ai-input-group">
+            <input type="text" id="user" class="ai-input" placeholder="手机号/邮箱">
+          </div>
+          <div class="ai-input-group">
+            <input type="text" id="pass" class="ai-input" placeholder="API 密钥">
+          </div>
+          <div class="ai-input-group" style="margin-bottom:0;">
+            <button id="btn-login" class="ai-btn btn-primary">快速登录</button>
+            <button id="btn-save" class="ai-btn btn-ghost">保存</button>
+          </div>
         </div>
-        <div class="ai-input-group">
-          <input type="text" id="user" class="ai-input" placeholder="手机号/邮箱">
-        </div>
-        <div class="ai-input-group">
-          <input type="text" id="pass" class="ai-input" placeholder="API 密钥">
-        </div>
-        <div class="ai-input-group" style="margin-bottom:0;">
-          <button id="btn-login" class="ai-btn btn-primary">快速登录</button>
-          <button id="btn-save" class="ai-btn btn-ghost">保存</button>
+
+        <!-- 旧版通知 & 循环购买 -->
+        <div class="ai-section">
+          <span class="ai-label">通知 & 循环购买 ⚙</span>
+          <div class="ai-input-group">
+            <input type="text" id="qmsg-token" class="ai-input" placeholder="Qmsg酱 Token (通知)">
+          </div>
+          <div class="toggle-row">
+            <span style="font-size:12px;color:var(--text-main);">成功后自动循环抢购（客户端）</span>
+            <label class="switch">
+              <input type="checkbox" id="auto-loop-toggle">
+              <span class="slider"></span>
+            </label>
+          </div>
         </div>
       </div>
 
-      <!-- 通知 & 循环购买 -->
-      <div class="ai-section">
-        <span class="ai-label">通知 & 循环购买 ⚙</span>
+      <!-- ── 服务器任务面板 ── -->
+      <div class="v5-pane" id="pane-task">
+        <div class="ai-section">
+          <span class="ai-label">捕获的请求 📡</span>
+          <div id="captured-info" style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">
+            尚未捕获——请先在秒杀页面点击"开始抢购"触发一次请求
+          </div>
+          <div class="ai-input-group" style="margin-bottom:0;">
+            <button id="btn-task-capture-clear" class="ai-btn btn-ghost" style="font-size:11px;">清除捕获</button>
+          </div>
+        </div>
+
+        <div class="ai-section">
+          <span class="ai-label">任务参数 ⚙</span>
+          <div class="settings-row">
+            <span class="settings-label">间隔(秒)</span>
+            <input type="number" id="task-interval" class="ai-input-sm" value="1" min="0.2" step="0.1" style="max-width:80px;">
+            <span class="settings-label" style="margin-left:8px;">最大次数</span>
+            <input type="number" id="task-max-count" class="ai-input-sm" value="0" min="0" style="max-width:80px;">
+            <span style="font-size:10px;color:var(--text-muted);">(0=不限)</span>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">超时(秒)</span>
+            <input type="number" id="task-timeout" class="ai-input-sm" value="0" min="0" style="max-width:80px;">
+            <span style="font-size:10px;color:var(--text-muted);">(0=不限)</span>
+            <div class="toggle-row" style="margin-left:auto;gap:6px;">
+              <span style="font-size:11px;color:var(--text-main);">成功后循环</span>
+              <label class="switch"><input type="checkbox" id="task-loop" checked><span class="slider"></span></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 运行中任务状态 -->
+        <div class="ai-section" id="task-status-section" style="display:none;">
+          <span class="ai-label">运行状态 🟢</span>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <span id="task-status-badge" class="task-badge badge-pending">准备中</span>
+            <span style="font-size:11px;color:var(--text-muted);">ID: <code id="task-id-display" style="font-size:10px;"></code></span>
+          </div>
+          <div style="font-size:11px;color:var(--text-main);">
+            ✅ 累计成功：<strong id="task-count-display">0</strong> 次
+            &nbsp;|&nbsp;
+            🔖 最近单号：<span id="task-last-order">N/A</span>
+          </div>
+          <div id="task-log-box"></div>
+        </div>
+
+        <div class="ai-input-group" style="margin-top:8px;">
+          <button id="btn-server-start" class="ai-btn btn-primary">🚀 服务器启动任务</button>
+          <button id="btn-server-stop" class="ai-btn btn-danger" style="display:none;">⏹ 停止任务</button>
+        </div>
+        <div id="task-msg" style="font-size:11px;text-align:center;margin-top:6px;color:var(--text-muted);"></div>
+      </div>
+
+      <!-- ── 设置面板 ── -->
+      <div class="v5-pane" id="pane-settings">
+        <div class="ai-section">
+          <span class="ai-label">站点备注 🏷</span>
+          <div class="settings-row">
+            <input type="text" id="cfg-site-remark" class="ai-input" placeholder="如：我的香港VPS-1（通知中显示）">
+          </div>
+        </div>
+
+        <!-- Telegram -->
+        <div class="ai-section">
+          <div class="toggle-row" style="margin-bottom:8px;">
+            <span class="ai-label" style="margin-bottom:0;">Telegram 通知 ✈️</span>
+            <label class="switch"><input type="checkbox" id="cfg-tg-enabled"><span class="slider"></span></label>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Bot Token</span>
+            <input type="text" id="cfg-tg-token" class="ai-input-sm" placeholder="123456:ABC...">
+          </div>
+          <div class="settings-row" style="margin-bottom:0;">
+            <span class="settings-label">Chat ID</span>
+            <input type="text" id="cfg-tg-chatid" class="ai-input-sm" placeholder="-100123456789">
+          </div>
+        </div>
+
+        <!-- Qmsg / QQ -->
+        <div class="ai-section">
+          <div class="toggle-row" style="margin-bottom:8px;">
+            <span class="ai-label" style="margin-bottom:0;">QQ 通知 (Qmsg酱) 💬</span>
+            <label class="switch"><input type="checkbox" id="cfg-qq-enabled"><span class="slider"></span></label>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Token</span>
+            <input type="text" id="cfg-qq-token" class="ai-input-sm" placeholder="Qmsg酱 Token">
+          </div>
+          <div class="settings-row" style="margin-bottom:0;">
+            <span class="settings-label">QQ 号</span>
+            <input type="text" id="cfg-qq-qq" class="ai-input-sm" placeholder="可选，指定接收QQ">
+          </div>
+        </div>
+
+        <!-- Bark -->
+        <div class="ai-section">
+          <div class="toggle-row" style="margin-bottom:8px;">
+            <span class="ai-label" style="margin-bottom:0;">Bark 通知 (iOS) 🍎</span>
+            <label class="switch"><input type="checkbox" id="cfg-bark-enabled"><span class="slider"></span></label>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Key</span>
+            <input type="text" id="cfg-bark-key" class="ai-input-sm" placeholder="Bark 设备 Key">
+          </div>
+          <div class="settings-row" style="margin-bottom:0;">
+            <span class="settings-label">服务器</span>
+            <input type="text" id="cfg-bark-server" class="ai-input-sm" placeholder="https://api.day.app">
+          </div>
+        </div>
+
+        <!-- 通知事件 -->
+        <div class="ai-section">
+          <span class="ai-label">通知事件 🔔</span>
+          <div class="toggle-row"><span style="font-size:12px;">🚀 任务启动</span><label class="switch"><input type="checkbox" id="ev-start" checked><span class="slider"></span></label></div>
+          <div class="toggle-row"><span style="font-size:12px;">✅ 购买成功</span><label class="switch"><input type="checkbox" id="ev-success" checked><span class="slider"></span></label></div>
+          <div class="toggle-row"><span style="font-size:12px;">❌ 任务出错</span><label class="switch"><input type="checkbox" id="ev-error" checked><span class="slider"></span></label></div>
+          <div class="toggle-row"><span style="font-size:12px;">⏹ 任务停止</span><label class="switch"><input type="checkbox" id="ev-stop" checked><span class="slider"></span></label></div>
+          <div class="toggle-row" style="margin-bottom:0;"><span style="font-size:12px;">⏰ 任务超时</span><label class="switch"><input type="checkbox" id="ev-timeout" checked><span class="slider"></span></label></div>
+        </div>
+
         <div class="ai-input-group">
-          <input type="text" id="qmsg-token" class="ai-input" placeholder="Qmsg酱 Token (通知)">
+          <button id="btn-save-settings" class="ai-btn btn-primary">💾 保存设置</button>
+          <button id="btn-test-notify" class="ai-btn btn-ghost">📢 测试通知</button>
         </div>
-        <div class="toggle-row">
-          <span style="font-size:12px;color:var(--text-main);">成功后自动循环抢购</span>
-          <label class="switch">
-            <input type="checkbox" id="auto-loop-toggle">
-            <span class="slider"></span>
-          </label>
-        </div>
+        <div id="settings-msg" style="font-size:11px;text-align:center;margin-top:6px;color:var(--text-muted);"></div>
       </div>
 
       <div id="status-bar">系统就绪</div>
@@ -335,26 +560,28 @@
 
     <script>
     (function () {
-      // 1. 核心常量与拦截
+      // ── 核心常量 ────────────────────────────────────────────────────────────
       const BASE = 'https://www.szhdy.com';
-      let loopCount = 0;
-      let isLooping = false;
+      let loopCount  = 0;
+      let isLooping  = false;
+      let currentTaskId = null;
+      let pollTimer  = null;
+      let capturedRequest = null;   // 从 XHR 钩子捕获的请求信息
 
-      // 兼容旧版 localStorage 键位
       const STORAGE_KEYS = {
         ACCOUNTS: 'ai_accounts',
-        QMSG: 'ai_qmsg_token',
-        REPEAT: 'ai_auto_repeat'
+        QMSG:     'ai_qmsg_token',
+        REPEAT:   'ai_auto_repeat',
       };
 
-      // 遮罩消除逻辑
+      // ── 加载遮罩 ─────────────────────────────────────────────────────────────
       window.onload = () => {
         const loader = document.getElementById('v4-loader');
         loader.style.opacity = '0';
         setTimeout(() => loader.remove(), 600);
       };
 
-      // 屏蔽数据上报后门
+      // ── 屏蔽数据上报后门 ──────────────────────────────────────────────────────
       const originalFetch = window.fetch;
       window.fetch = function (url, options) {
         if (typeof url === 'string' && (url.includes('/api_dummy_safe') || url.includes('/order/data.php'))) {
@@ -365,11 +592,11 @@
         return originalFetch.apply(this, arguments);
       };
 
-      // UI 更新函数
+      // ── UI 辅助 ──────────────────────────────────────────────────────────────
       function updateStatus(msg, type = '') {
         const el = document.getElementById('status-bar');
         el.textContent = msg;
-        el.className = type ? 'status-' + type : '';
+        el.className   = type ? 'status-' + type : '';
       }
 
       function setModuleState(state) {
@@ -383,42 +610,70 @@
         }
       }
 
-      // XHR 钩子
-      const XHR = XMLHttpRequest.prototype;
-      const oOpen = XHR.open;
-      const oSend = XHR.send;
+      // ── XHR 钩子（捕获请求 + 检测成功） ─────────────────────────────────────
+      const XHR       = XMLHttpRequest.prototype;
+      const oOpen     = XHR.open;
+      const oSend     = XHR.send;
+      const oSetHeader = XHR.setRequestHeader;
 
-      XHR.open = function(method, url) {
-        this._url = url;
+      XHR.open = function (method, url) {
+        this._url     = url;
+        this._method  = method;
+        this._hdrs    = {};
         return oOpen.apply(this, arguments);
       };
 
-      XHR.send = function(body) {
-        if (this._url.includes('/cart/settle')) {
+      XHR.setRequestHeader = function (header, value) {
+        if (this._hdrs) this._hdrs[header] = value;
+        return oSetHeader.apply(this, arguments);
+      };
+
+      XHR.send = function (body) {
+        if (this._url && this._url.includes('/cart/settle')) {
+          // 捕获请求供服务器任务使用
+          capturedRequest = {
+            url:     this._url,
+            method:  (this._method || 'POST').toUpperCase(),
+            headers: Object.assign({}, this._hdrs || {}),
+            body:    (typeof body === 'string') ? body
+                     : (body instanceof URLSearchParams) ? body.toString()
+                     : '',
+          };
+          updateCapturedUI();
+
           this.addEventListener('load', () => {
             try {
               const res = JSON.parse(this.responseText);
               if (res.status == 200 || res.status === '200') {
                 onOrderSuccess(res.data?.invoiceid);
               }
-            } catch(e){}
+            } catch (e) {}
           });
         }
         return oSend.apply(this, arguments);
       };
 
+      function updateCapturedUI() {
+        const el = document.getElementById('captured-info');
+        if (!el || !capturedRequest) return;
+        el.innerHTML =
+          `<span style="color:var(--success);">✅ 已捕获</span>&nbsp;` +
+          `<code style="font-size:10px;word-break:break-all;">${capturedRequest.url}</code>`;
+      }
+
+      // ── 客户端成功回调（兼容旧版循环） ──────────────────────────────────────
       function onOrderSuccess(invId) {
         loopCount++;
         document.getElementById('loop-count').textContent = loopCount;
         updateStatus(`✔ 第 ${loopCount} 单成功: ${invId || 'OK'}`, 'ok');
-        
-        // 发送通知
+
+        // 旧版 Qmsg 通知（仍保留）
         const token = localStorage.getItem(STORAGE_KEYS.QMSG);
         if (token) {
           const msg = `✅ 秒杀成功！\n⏰ ${new Date().toLocaleTimeString()}\n🔖 单号：${invId || 'N/A'}\n🔄 累计下单：${loopCount}`;
           originalFetch(`https://qmsg.zendee.cn/send/${token}`, {
             method: 'POST', body: 'msg=' + encodeURIComponent(msg),
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'}
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
           });
         }
 
@@ -438,18 +693,31 @@
         isLooping = false;
         setModuleState('idle');
         updateStatus('⏹ 已停止: ' + (reason || '手动'), '');
-        const stopBtn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('停止') && !b.innerText.includes('循环'));
+        const stopBtn = Array.from(document.querySelectorAll('button')).find(
+          b => b.innerText.includes('停止') && !b.innerText.includes('循环')
+        );
         if (stopBtn) stopBtn.click();
       }
 
-      // 将面板注入 Vue 主内容区（等待 Vue 渲染完成）
+      // ── 标签切换 ─────────────────────────────────────────────────────────────
+      function initTabs() {
+        document.querySelectorAll('.v5-tab').forEach(tab => {
+          tab.addEventListener('click', () => {
+            document.querySelectorAll('.v5-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.v5-pane').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById('pane-' + tab.dataset.tab).classList.add('active');
+          });
+        });
+      }
+
+      // ── 面板注入 ─────────────────────────────────────────────────────────────
       function injectPanelIntoMain() {
         const panel = document.getElementById('ai-v4-panel');
         if (!panel) return;
-        // 找到 Vue 渲染的主内容容器 (max-w-[800px] 或 space-y-4)
         const container =
           document.querySelector('[class*="max-w-\\[800px\\]"]') ||
-          document.querySelector('[class*="space-y-4"]') ||
+          document.querySelector('[class*="space-y-4"]')          ||
           document.querySelector('#app > div > div');
         if (container) {
           panel.style.display = '';
@@ -459,21 +727,158 @@
         return false;
       }
 
-      // 交互逻辑
+      // ── 服务器 API 辅助 ───────────────────────────────────────────────────────
+      async function apiGet(path) {
+        const r = await originalFetch(path);
+        return r.json();
+      }
+      async function apiPost(path, data) {
+        const r = await originalFetch(path, {
+          method: 'POST',
+          body: JSON.stringify(data),
+          headers: { 'Content-Type': 'application/json' },
+        });
+        return r.json();
+      }
+
+      // ── 设置 ─────────────────────────────────────────────────────────────────
+      async function loadSettingsToUI() {
+        try {
+          const res = await apiGet('/api/settings');
+          if (res.code !== 1) return;
+          const s = res.data;
+          const g = id => document.getElementById(id);
+          g('cfg-site-remark').value = s.site_remark || '';
+          const tg = s.notify?.telegram || {};
+          g('cfg-tg-enabled').checked = !!tg.enabled;
+          g('cfg-tg-token').value     = tg.bot_token || '';
+          g('cfg-tg-chatid').value    = tg.chat_id   || '';
+          const qq = s.notify?.qmsg || {};
+          g('cfg-qq-enabled').checked = !!qq.enabled;
+          g('cfg-qq-token').value     = qq.token || '';
+          g('cfg-qq-qq').value        = qq.qq    || '';
+          const bk = s.notify?.bark || {};
+          g('cfg-bark-enabled').checked = !!bk.enabled;
+          g('cfg-bark-key').value       = bk.key    || '';
+          g('cfg-bark-server').value    = bk.server || 'https://api.day.app';
+          const ev = s.notify_events || {};
+          g('ev-start').checked   = ev.start   !== false;
+          g('ev-success').checked = ev.success !== false;
+          g('ev-error').checked   = ev.error   !== false;
+          g('ev-stop').checked    = ev.stop    !== false;
+          g('ev-timeout').checked = ev.timeout !== false;
+        } catch (e) {}
+      }
+
+      function collectSettings() {
+        const g = id => document.getElementById(id);
+        return {
+          site_remark: g('cfg-site-remark').value.trim(),
+          notify: {
+            telegram: {
+              enabled:   g('cfg-tg-enabled').checked,
+              bot_token: g('cfg-tg-token').value.trim(),
+              chat_id:   g('cfg-tg-chatid').value.trim(),
+            },
+            qmsg: {
+              enabled: g('cfg-qq-enabled').checked,
+              token:   g('cfg-qq-token').value.trim(),
+              qq:      g('cfg-qq-qq').value.trim(),
+            },
+            bark: {
+              enabled: g('cfg-bark-enabled').checked,
+              key:     g('cfg-bark-key').value.trim(),
+              server:  g('cfg-bark-server').value.trim() || 'https://api.day.app',
+            },
+          },
+          notify_events: {
+            start:   g('ev-start').checked,
+            success: g('ev-success').checked,
+            error:   g('ev-error').checked,
+            stop:    g('ev-stop').checked,
+            timeout: g('ev-timeout').checked,
+          },
+        };
+      }
+
+      // ── 服务器任务 ────────────────────────────────────────────────────────────
+      function setTaskMsg(msg, color) {
+        const el = document.getElementById('task-msg');
+        el.textContent = msg;
+        el.style.color = color || 'var(--text-muted)';
+      }
+
+      function updateTaskUI(task) {
+        if (!task) return;
+        const statusSection = document.getElementById('task-status-section');
+        statusSection.style.display = 'block';
+
+        const badge = document.getElementById('task-status-badge');
+        const statusMap = {
+          running: ['运行中', 'badge-running'],
+          stopped: ['已停止', 'badge-stopped'],
+          success: ['已成功', 'badge-success'],
+          error:   ['出错了', 'badge-error'],
+          timeout: ['已超时', 'badge-timeout'],
+          pending: ['准备中', 'badge-pending'],
+        };
+        const [label, cls] = statusMap[task.status] || ['未知', 'badge-pending'];
+        badge.textContent = label;
+        badge.className = 'task-badge ' + cls;
+
+        document.getElementById('task-id-display').textContent  = task.id;
+        document.getElementById('task-count-display').textContent = task.count;
+        document.getElementById('task-last-order').textContent  = task.last_order || 'N/A';
+
+        // 日志
+        const logBox = document.getElementById('task-log-box');
+        if (task.logs && task.logs.length) {
+          logBox.innerHTML = task.logs.slice(-30).map(l => {
+            const safe = l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            return `<div>${safe}</div>`;
+          }).join('');
+          logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        const isActive = task.status === 'running';
+        document.getElementById('btn-server-start').style.display = isActive ? 'none' : '';
+        document.getElementById('btn-server-stop').style.display  = isActive ? '' : 'none';
+
+        if (!isActive && pollTimer) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
+      }
+
+      function startPolling(taskId) {
+        currentTaskId = taskId;
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(async () => {
+          try {
+            const res = await apiGet(`/api/task/status?id=${taskId}`);
+            if (res.code === 1) updateTaskUI(res.data);
+          } catch (e) {
+            console.warn('[APIhdy] 轮询任务状态失败:', e.message);
+          }
+        }, 2000);
+      }
+
+      // ── 主初始化 ─────────────────────────────────────────────────────────────
       window.addEventListener('DOMContentLoaded', () => {
-        // 用 MutationObserver 等待 Vue 渲染后注入面板
+        // 等待 Vue 渲染后注入面板
         const panelObserver = new MutationObserver(() => {
           if (injectPanelIntoMain()) panelObserver.disconnect();
         });
         panelObserver.observe(document.getElementById('app'), { childList: true, subtree: true });
 
-        const accounts = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACCOUNTS) || '{}');
-        const sel = document.getElementById('acc-list');
+        initTabs();
+
+        // ── 账号 ──
+        const accounts  = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACCOUNTS) || '{}');
+        const sel        = document.getElementById('acc-list');
         const updateAccSelect = () => {
           sel.innerHTML = '<option value="">快速切换账号</option>';
-          Object.keys(accounts).forEach(u => {
-            const op = new Option(u, u); sel.add(op);
-          });
+          Object.keys(accounts).forEach(u => sel.add(new Option(u, u)));
         };
         updateAccSelect();
 
@@ -499,17 +904,14 @@
           const u = document.getElementById('user').value.trim();
           const p = document.getElementById('pass').value.trim();
           if (!u || !p) return updateStatus('请输入完整信息', 'err');
-          
           updateStatus('正在通过原生代理验证...', 'ok');
-          document.getElementById('btn-login').disabled = true;
-          document.getElementById('btn-login').innerHTML = '<div class="ai-loading-mini"></div> 验证中';
-
+          const btn = document.getElementById('btn-login');
+          btn.disabled = true;
+          btn.innerHTML = '<div class="ai-loading-mini"></div> 验证中';
           try {
-            // 使用 v4.2 原生代理
             const r = await originalFetch('/local_proxy_login', {
-              method: 'POST', 
-              body: JSON.stringify({username: u, password: p}),
-              headers: {'Content-Type': 'application/json'}
+              method: 'POST', body: JSON.stringify({ username: u, password: p }),
+              headers: { 'Content-Type': 'application/json' },
             });
             const d = await r.json();
             if (d.status == 200 || d.status === '200') {
@@ -517,31 +919,137 @@
               setTimeout(() => location.reload(), 1000);
             } else {
               updateStatus('❌ 登录失败: ' + (d.msg || '凭据错误'), 'err');
-              document.getElementById('btn-login').disabled = false;
-              document.getElementById('btn-login').innerHTML = '快速登录';
+              btn.disabled = false; btn.innerHTML = '快速登录';
             }
-          } catch(e) { 
-            updateStatus('❌ 代理通讯失败: ' + e.message, 'err'); 
-            document.getElementById('btn-login').disabled = false;
-            document.getElementById('btn-login').innerHTML = '快速登录';
+          } catch (e) {
+            updateStatus('❌ 代理通讯失败: ' + e.message, 'err');
+            btn.disabled = false; btn.innerHTML = '快速登录';
           }
         };
 
         document.getElementById('qmsg-token').value = localStorage.getItem(STORAGE_KEYS.QMSG) || '';
-        document.getElementById('qmsg-token').oninput = (e) => localStorage.setItem(STORAGE_KEYS.QMSG, e.target.value);
+        document.getElementById('qmsg-token').oninput = e => localStorage.setItem(STORAGE_KEYS.QMSG, e.target.value);
 
         const repeatToggle = document.getElementById('auto-loop-toggle');
-        repeatToggle.checked = localStorage.getItem(STORAGE_KEYS.REPEAT) === 'true';
-        repeatToggle.onchange = (e) => localStorage.setItem(STORAGE_KEYS.REPEAT, e.target.checked);
+        repeatToggle.checked  = localStorage.getItem(STORAGE_KEYS.REPEAT) === 'true';
+        repeatToggle.onchange = e => localStorage.setItem(STORAGE_KEYS.REPEAT, e.target.checked);
 
         document.getElementById('stop-loop-banner').onclick = () => stopWorkflow('用户手动拦截');
-
-        // 检测原始停止按钮
-        document.addEventListener('click', (e) => {
+        document.addEventListener('click', e => {
           if (e.target.innerText?.includes('停止') && !e.target.id?.includes('stop-loop')) {
             if (isLooping) stopWorkflow('外部系统干预');
           }
         });
+
+        // ── 服务器任务 ──
+        document.getElementById('btn-task-capture-clear').onclick = () => {
+          capturedRequest = null;
+          document.getElementById('captured-info').innerHTML =
+            '尚未捕获——请先在秒杀页面点击"开始抢购"触发一次请求';
+        };
+
+        document.getElementById('btn-server-start').onclick = async () => {
+          if (!capturedRequest || !capturedRequest.url) {
+            setTaskMsg('❌ 尚未捕获请求，请先触发一次抢购操作', 'var(--danger)');
+            return;
+          }
+          const payload = {
+            url:       capturedRequest.url,
+            method:    capturedRequest.method,
+            headers:   capturedRequest.headers,
+            body:      capturedRequest.body,
+            interval:  parseFloat(document.getElementById('task-interval').value)   || 1,
+            max_count: parseInt(document.getElementById('task-max-count').value)     || 0,
+            timeout:   parseInt(document.getElementById('task-timeout').value)       || 0,
+            loop:      document.getElementById('task-loop').checked,
+          };
+          try {
+            const res = await apiPost('/api/task/start', payload);
+            if (res.code === 1) {
+              setTaskMsg(`✅ 任务 ${res.task_id} 已在服务器启动`, 'var(--success)');
+              document.getElementById('task-status-section').style.display = 'block';
+              document.getElementById('task-id-display').textContent = res.task_id;
+              document.getElementById('btn-server-start').style.display = 'none';
+              document.getElementById('btn-server-stop').style.display  = '';
+              startPolling(res.task_id);
+            } else {
+              setTaskMsg('❌ ' + (res.msg || '启动失败'), 'var(--danger)');
+            }
+          } catch (e) {
+            setTaskMsg('❌ 通讯失败: ' + e.message, 'var(--danger)');
+          }
+        };
+
+        document.getElementById('btn-server-stop').onclick = async () => {
+          if (!currentTaskId) return;
+          try {
+            const res = await apiPost('/api/task/stop', { task_id: currentTaskId });
+            setTaskMsg(res.code === 1 ? '⏹ 已发送停止信号' : ('❌ ' + res.msg), '');
+          } catch (e) {
+            setTaskMsg('❌ 通讯失败: ' + e.message, 'var(--danger)');
+          }
+        };
+
+        // ── 设置保存 & 测试 ──
+        document.getElementById('btn-save-settings').onclick = async () => {
+          const msg = document.getElementById('settings-msg');
+          try {
+            const res = await apiPost('/api/settings', collectSettings());
+            msg.textContent = res.code === 1 ? '✅ 设置已保存' : ('❌ ' + res.msg);
+            msg.style.color = res.code === 1 ? 'var(--success)' : 'var(--danger)';
+          } catch (e) {
+            msg.textContent = '❌ 保存失败: ' + e.message;
+            msg.style.color = 'var(--danger)';
+          }
+          setTimeout(() => { msg.textContent = ''; }, 3000);
+        };
+
+        document.getElementById('btn-test-notify').onclick = async () => {
+          const msg = document.getElementById('settings-msg');
+          msg.textContent = '发送测试通知中...';
+          // 先保存当前设置，再触发一个虚拟成功通知
+          try {
+            await apiPost('/api/settings', collectSettings());
+            const res = await apiPost('/api/task/start', {
+              url:  'https://httpbin.org/status/200',
+              method: 'GET',
+              headers: {},
+              body: '',
+              interval: 999,
+              max_count: 1,
+              timeout: 10,
+              loop: false,
+            });
+            if (res.code === 1) {
+              msg.textContent = '✅ 已触发测试任务，请查看通知';
+              msg.style.color = 'var(--success)';
+            }
+          } catch (e) {
+            msg.textContent = '❌ 测试失败: ' + e.message;
+            msg.style.color = 'var(--danger)';
+          }
+          setTimeout(() => { msg.textContent = ''; }, 4000);
+        };
+
+        // 初始加载设置
+        loadSettingsToUI();
+
+        // 如果有进行中的任务，恢复轮询（页面刷新后）
+        (async () => {
+          try {
+            const res = await apiGet('/api/task/status');
+            if (res.code === 1 && Array.isArray(res.data)) {
+              const running = res.data.find(t => t.status === 'running');
+              if (running) {
+                updateTaskUI(running);
+                startPolling(running.id);
+                setTaskMsg(`🟢 已恢复监听任务 ${running.id}`, 'var(--success)');
+              }
+            }
+          } catch (e) {
+            console.warn('[APIhdy] 恢复任务状态失败:', e.message);
+          }
+        })();
 
         console.log('%c APIhdy V5 Supreme Loaded ', 'background: #06b6d4; color: #000; font-weight: bold;');
       });
