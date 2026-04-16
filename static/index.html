@@ -98,33 +98,16 @@
       }
 
       #ai-v4-panel {
-        position: fixed;
-        bottom: 24px;
-        right: 24px;
-        width: 340px;
-        background: var(--bg-glass);
-        border: 1px solid var(--border-glass);
-        border-radius: 24px;
-        padding: 20px;
-        z-index: 100000;
         color: var(--text-main);
         font-family: 'Inter', -apple-system, sans-serif;
-        box-shadow: 
-          0 0 0 1px rgba(2, 132, 199, 0.15),
-          0 10px 40px -10px rgba(0, 0, 0, 0.15),
-          0 4px 16px rgba(0, 0, 0, 0.08);
-        backdrop-filter: blur(20px);
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         user-select: none;
         overflow: hidden;
-      }
-
-      #ai-v4-panel::before {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; right: 0; height: 1px;
-        background: linear-gradient(90deg, transparent, var(--primary), transparent);
-        opacity: 0.4;
+        border-radius: 24px;
+        border: 1px solid rgba(0,0,0,0.08);
+        background: var(--bg-glass);
+        box-shadow: 0 1px 8px rgba(0,0,0,0.08);
+        padding: 20px;
+        margin-bottom: 16px;
       }
 
       #ai-v4-panel h3 {
@@ -273,12 +256,13 @@
       #stop-loop-banner {
         display: none;
         background: linear-gradient(90deg, #991b1b, #ef4444);
-        margin: 12px -20px -20px -20px;
+        border-radius: 12px;
         padding: 12px;
         text-align: center;
         font-weight: 800;
         font-size: 13px;
         cursor: pointer;
+        margin-top: 12px;
         animation: slideUp 0.3s ease-out;
       }
       @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -293,14 +277,14 @@
 
     <div id="app"></div>
 
-    <!-- 4.0 Pro Panel -->
-    <div id="ai-v4-panel">
+    <!-- 账号·通知·循环购买 (由 JS 注入主内容区) -->
+    <div id="ai-v4-panel" style="display:none;">
       <h3>
         <span style="display:flex;align-items:center;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:8px;">
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
           </svg>
-          狐蒂云秒杀 V5 Supreme
+          账号 · 通知 · 循环购买
         </span>
         <span id="v4-indicator" style="font-size:10px; opacity:0.8;">
           <span class="status-dot dot-idle"></span>待机
@@ -327,9 +311,9 @@
         </div>
       </div>
 
-      <!-- 设置 -->
+      <!-- 通知 & 循环购买 -->
       <div class="ai-section">
-        <span class="ai-label">Settings ⚙</span>
+        <span class="ai-label">通知 & 循环购买 ⚙</span>
         <div class="ai-input-group">
           <input type="text" id="qmsg-token" class="ai-input" placeholder="Qmsg酱 Token (通知)">
         </div>
@@ -458,8 +442,31 @@
         if (stopBtn) stopBtn.click();
       }
 
+      // 将面板注入 Vue 主内容区（等待 Vue 渲染完成）
+      function injectPanelIntoMain() {
+        const panel = document.getElementById('ai-v4-panel');
+        if (!panel) return;
+        // 找到 Vue 渲染的主内容容器 (max-w-[800px] 或 space-y-4)
+        const container =
+          document.querySelector('[class*="max-w-\\[800px\\]"]') ||
+          document.querySelector('[class*="space-y-4"]') ||
+          document.querySelector('#app > div > div');
+        if (container) {
+          panel.style.display = '';
+          container.insertBefore(panel, container.firstChild);
+          return true;
+        }
+        return false;
+      }
+
       // 交互逻辑
       window.addEventListener('DOMContentLoaded', () => {
+        // 用 MutationObserver 等待 Vue 渲染后注入面板
+        const panelObserver = new MutationObserver(() => {
+          if (injectPanelIntoMain()) panelObserver.disconnect();
+        });
+        panelObserver.observe(document.getElementById('app'), { childList: true, subtree: true });
+
         const accounts = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACCOUNTS) || '{}');
         const sel = document.getElementById('acc-list');
         const updateAccSelect = () => {
