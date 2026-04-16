@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>🦊 狐蒂云极速秒杀系统 V5.0 (Supreme Edition)</title>
+    <title>🦊 狐蒂云极速秒杀系统 V5.0</title>
     <!-- URL 规范化：Vue Router 使用 '/' 作为基础路径，面板路径需在路由初始化前重置。
          目标地址硬编码为 '/'，不依赖任何用户输入，非跳转重定向。 -->
     <script>
@@ -19,27 +19,61 @@
     <!-- 4.0 增强型 UI 样式 -->
     <style>
       :root {
-        --primary: #06b6d4;
+        --primary: #0284c7;
         --secondary: #3b82f6;
         --success: #10b981;
         --danger: #ef4444;
         --warning: #f59e0b;
-        --bg-glass: rgba(15, 23, 42, 0.95);
-        --border-glass: rgba(255, 255, 255, 0.1);
-        --text-main: #f1f5f9;
-        --text-muted: #94a3b8;
+        --bg-glass: rgba(255, 255, 255, 0.97);
+        --border-glass: rgba(0, 0, 0, 0.1);
+        --text-main: #0f172a;
+        --text-muted: #64748b;
       }
 
       body {
-        background: #020617; /* 深空蓝背景 */
+        background: #f1f5f9; /* 亮色背景 */
         margin: 0; padding: 0;
       }
+
+      /* 全局亮色模式覆盖 */
+      .bg-slate-950 { background-color: #f1f5f9 !important; }
+      .text-slate-100 { color: #0f172a !important; }
+      .text-slate-200 { color: #1e293b !important; }
+      .text-slate-300 { color: #334155 !important; }
+      .text-slate-400 { color: #475569 !important; }
+      .text-slate-500 { color: #64748b !important; }
+      .text-white { color: #0f172a !important; }
+      .text-white\/70 { color: #475569 !important; }
+      .text-white\/80 { color: #334155 !important; }
+
+      /* 卡片背景 */
+      .bg-white\/5 { background-color: #ffffff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important; }
+      .bg-white\/10 { background-color: rgba(241,245,249,0.8) !important; }
+      .bg-white\/15 { background-color: rgba(248,250,252,0.9) !important; }
+      .bg-white\/20 { background-color: rgba(255,255,255,1) !important; }
+
+      /* 边框 */
+      .border-white\/5 { border-color: #f1f5f9 !important; }
+      .border-white\/10 { border-color: #e2e8f0 !important; }
+      .border-white\/15 { border-color: #cbd5e1 !important; }
+
+      /* 深色背景卡片 */
+      .bg-slate-900\/60, .bg-slate-900\/70, .bg-slate-900\/80 { background-color: #f8fafc !important; }
+      .bg-slate-950\/80, .bg-slate-950\/95 { background-color: #f1f5f9 !important; }
+      .bg-slate-800 { background-color: #e2e8f0 !important; }
+      .bg-slate-700 { background-color: #cbd5e1 !important; }
+
+      /* 遮罩层 */
+      .bg-black\/70 { background-color: rgba(0,0,0,0.5) !important; }
+
+      /* 日志卡片文字 */
+      .text-slate-950 { color: #0f172a !important; }
 
       /* 加载中动画 */
       #v4-loader {
         position: fixed;
         inset: 0;
-        background: #020617;
+        background: #f1f5f9;
         z-index: 100001;
         display: flex;
         flex-direction: column;
@@ -76,9 +110,9 @@
         color: var(--text-main);
         font-family: 'Inter', -apple-system, sans-serif;
         box-shadow: 
-          0 0 0 1px rgba(6, 182, 212, 0.1),
-          0 10px 40px -10px rgba(0, 0, 0, 0.5),
-          0 0 30px -5px rgba(6, 182, 212, 0.2);
+          0 0 0 1px rgba(2, 132, 199, 0.15),
+          0 10px 40px -10px rgba(0, 0, 0, 0.15),
+          0 4px 16px rgba(0, 0, 0, 0.08);
         backdrop-filter: blur(20px);
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         user-select: none;
@@ -90,7 +124,7 @@
         position: absolute;
         top: 0; left: 0; right: 0; height: 1px;
         background: linear-gradient(90deg, transparent, var(--primary), transparent);
-        opacity: 0.5;
+        opacity: 0.4;
       }
 
       #ai-v4-panel h3 {
@@ -125,14 +159,14 @@
       }
 
       .ai-section {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        background: rgba(241, 245, 249, 0.8);
+        border: 1px solid rgba(0, 0, 0, 0.07);
         border-radius: 16px;
         padding: 12px;
         margin-bottom: 12px;
         transition: border-color 0.3s;
       }
-      .ai-section:hover { border-color: rgba(6, 182, 212, 0.2); }
+      .ai-section:hover { border-color: rgba(2, 132, 199, 0.3); }
 
       .ai-label {
         display: block;
@@ -148,16 +182,16 @@
       
       .ai-input, .ai-select {
         flex: 1;
-        background: rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: #fff;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        color: #0f172a;
         padding: 8px 12px;
         border-radius: 12px;
         font-size: 13px;
         outline: none;
         transition: all 0.2s;
       }
-      .ai-input:focus { border-color: var(--primary); background: rgba(0,0,0,0.5); }
+      .ai-input:focus { border-color: var(--primary); background: #f8fafc; }
 
       .ai-btn {
         flex: 1;
@@ -175,8 +209,8 @@
       }
       .ai-btn:active { transform: scale(0.95); }
       .btn-primary { background: var(--primary); color: #000; }
-      .btn-ghost { background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
-      .btn-ghost:hover { background: rgba(255,255,255,0.1); }
+      .btn-ghost { background: rgba(0,0,0,0.05); color: #334155; border: 1px solid rgba(0,0,0,0.1); }
+      .btn-ghost:hover { background: rgba(0,0,0,0.08); }
       .btn-danger { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.2); }
       .btn-danger:hover { background: rgba(239, 68, 68, 0.25); }
 
@@ -198,7 +232,7 @@
         position: absolute;
         cursor: pointer;
         top: 0; left: 0; right: 0; bottom: 0;
-        background-color: rgba(255,255,255,0.1);
+        background-color: #cbd5e1;
         transition: .4s;
         border-radius: 20px;
       }
@@ -219,7 +253,7 @@
         text-align: center;
         padding-top: 10px;
         color: var(--text-muted);
-        border-top: 1px solid rgba(255,255,255,0.05);
+        border-top: 1px solid rgba(0,0,0,0.07);
         margin-top: 16px;
       }
       .status-ok { color: var(--success); }
@@ -229,7 +263,7 @@
       .ai-loading-mini {
         width: 12px;
         height: 12px;
-        border: 2px solid rgba(255,255,255,0.1);
+        border: 2px solid rgba(0,0,0,0.1);
         border-top-color: var(--primary);
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
