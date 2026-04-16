@@ -369,6 +369,7 @@
       };
       const MAX_STORED_CONFIGS = 20;
       const MIN_INTERVAL_SECONDS = 0.2;
+      const POLL_INTERVAL_MS = 2000;
       const DEFAULT_CAPTURE_STATE = {
         configs: [],
         product: { name: '', price: '', cycle: '', status: 'idle' }
@@ -419,7 +420,9 @@
         if (typeof body === 'string') return body;
         if (body instanceof URLSearchParams) return body.toString();
         if (typeof FormData !== 'undefined' && body instanceof FormData) {
-          return Array.from(body.entries()).map(([k, v]) => `${k}=${v}`).join('&');
+          return Array.from(body.entries())
+            .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+            .join('&');
         }
         if (body instanceof Blob || body instanceof ArrayBuffer) return '';
         if (ArrayBuffer.isView(body)) return '';
@@ -476,12 +479,27 @@
 
       function getProductSnapshot() {
         const title = document.title.replace(/^🦊\s*/, '').trim();
+        const product = captureState.product || DEFAULT_CAPTURE_STATE.product;
         return {
-          name: title || (captureState.product && captureState.product.name) || '',
-          price: (captureState.product && captureState.product.price) || '',
+          name: title || product.name || '',
+          price: product.price || '',
           cycle: document.getElementById('auto-loop-toggle')?.checked ? '服务器循环' : '单次/有限次数',
-          status: (captureState.product && captureState.product.status) || 'idle'
+          status: product.status || 'idle'
         };
+      }
+
+      function compareTaskStartTime(a, b) {
+        return String(b.start_time || '').localeCompare(String(a.start_time || ''));
+      }
+
+      function getRequestSignature(config) {
+        return `${config.method}|${config.url}|${config.body}`;
+      }
+
+      function getInputNumberValue(elementId, defaultValue) {
+        const raw = document.getElementById(elementId).value || String(defaultValue);
+        const parsed = defaultValue % 1 === 0 ? parseInt(raw, 10) : parseFloat(raw);
+        return Number.isFinite(parsed) ? parsed : defaultValue;
       }
 
       async function apiFetch(path, options = {}) {
@@ -525,7 +543,7 @@
 
       function renderTaskList() {
         const wrap = document.getElementById('task-list');
-        const tasks = Array.isArray(taskState) ? taskState.slice().sort((a, b) => String(b.start_time || '').localeCompare(String(a.start_time || ''))) : [];
+        const tasks = Array.isArray(taskState) ? taskState.slice().sort(compareTaskStartTime) : [];
         if (!tasks.length) {
           wrap.innerHTML = '<div style="font-size:12px;color:var(--text-main);padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.04);">暂无服务器任务；抓到一次请求后即可在这里启动后台抢购。</div>';
           return;
@@ -600,8 +618,8 @@
         };
         if (!normalized.url) return;
         const list = Array.isArray(captureState.configs) ? captureState.configs.slice() : [];
-        const signature = `${normalized.method}|${normalized.url}|${normalized.body}`;
-        if (list.some((item) => `${item.method}|${item.url}|${item.body}` === signature)) return;
+        const signature = getRequestSignature(normalized);
+        if (list.some((item) => getRequestSignature(item) === signature)) return;
         list.push(normalized);
         captureState = {
           ...captureState,
@@ -630,9 +648,9 @@
       }
 
       function getServerTaskPayload() {
-        const interval = parseFloat(document.getElementById('server-interval').value || '1') || 1;
-        const maxCount = parseInt(document.getElementById('server-max-count').value || '0', 10) || 0;
-        const timeout = parseInt(document.getElementById('server-timeout').value || '0', 10) || 0;
+        const interval = getInputNumberValue('server-interval', 1);
+        const maxCount = getInputNumberValue('server-max-count', 0);
+        const timeout = getInputNumberValue('server-timeout', 0);
         return {
           configs: Array.isArray(captureState.configs) ? captureState.configs : [],
           interval: Math.max(MIN_INTERVAL_SECONDS, interval),
@@ -715,7 +733,7 @@
               if (data && (data.status === 200 || data.status === '200')) {
                 onOrderSuccess(data.data && data.data.invoiceid);
               }
-            }).catch(() => {});
+            }).catch((error) => console.debug('capture fetch parse failed', error));
           }
           return response;
         });
@@ -851,6 +869,7 @@
         const intervalInput = document.getElementById('server-interval');
         const maxCountInput = document.getElementById('server-max-count');
         const timeoutInput = document.getElementById('server-timeout');
+        intervalInput.min = String(MIN_INTERVAL_SECONDS);
         intervalInput.value = localStorage.getItem(STORAGE_KEYS.INTERVAL) || '1';
         maxCountInput.value = localStorage.getItem(STORAGE_KEYS.MAX_COUNT) || '0';
         timeoutInput.value = localStorage.getItem(STORAGE_KEYS.TIMEOUT) || '0';
@@ -897,7 +916,7 @@
         refreshServerState(true).catch((e) => updateStatus('读取服务器状态失败: ' + e.message, 'err'));
         pollTimer = setInterval(() => {
           refreshServerState(false).catch(() => {});
-        }, 2000);
+        }, POLL_INTERVAL_MS);
 
         console.log('%c APIhdy V5 Supreme Loaded ', 'background: #06b6d4; color: #000; font-weight: bold;');
       });
