@@ -672,7 +672,7 @@
       };
 
       // ── UI 辅助 ──────────────────────────────────────────────────────────────
-      function updateStatus(msg, type) {
+      function updateStatus(msg, type = '') {
         const el = document.getElementById('status-bar');
         el.textContent = msg;
         el.className   = type ? 'status-' + type : '';
@@ -696,7 +696,7 @@
       }
 
       function _escHtml(s) {
-        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
       }
 
       // ── XHR 钩子（捕获请求 + 检测成功） ─────────────────────────────────────
@@ -873,7 +873,7 @@
           const pidInfo = task.pid_count > 1
             ? `<span style="font-size:10px;color:var(--primary);font-weight:600;white-space:nowrap;">🔄 PID ${task.current_pid}/${task.pid_count}</span>`
             : '';
-          const resumedBadge = task.resumed
+          const resumedBadge = task.resumed === true
             ? `<span class="task-resumed-badge">🔄 已恢复</span>`
             : '';
           const logs = (task.logs || []).slice(-8);
