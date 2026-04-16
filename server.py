@@ -20,6 +20,7 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH  = os.path.join(BASE_DIR, 'config.json')
 SETTINGS_PATH = os.path.join(BASE_DIR, 'settings.json')
+TASKS_PATH    = os.path.join(BASE_DIR, 'tasks.json')
 
 
 def load_config():
@@ -81,6 +82,37 @@ def load_settings():
 def save_settings(data):
     with open(SETTINGS_PATH, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+
+
+# ── 任务持久化 ────────────────────────────────────────────────────────────────
+
+def _task_to_serializable(task: dict) -> dict:
+    """将任务转为可 JSON 序列化格式（保留 _cfg 以便服务重启后恢复）。"""
+    entry = {k: v for k, v in task.items() if not k.startswith('_')}
+    if '_cfg' in task:
+        entry['_cfg'] = task['_cfg']
+    return entry
+
+
+def save_tasks(tasks: dict):
+    """将当前任务状态写入 tasks.json。"""
+    try:
+        data = {tid: _task_to_serializable(t) for tid, t in tasks.items()}
+        with open(TASKS_PATH, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f'[Tasks] 保存失败: {e}', flush=True)
+
+
+def load_tasks() -> dict:
+    """从 tasks.json 读取任务状态。"""
+    if not os.path.exists(TASKS_PATH):
+        return {}
+    try:
+        with open(TASKS_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
 
 
 # ── 通知 ──────────────────────────────────────────────────────────────────────
@@ -204,6 +236,7 @@ class TaskManager:
             'logs':        [],
             'pid_count':   pid_count,
             'current_pid': 1,
+            'resumed':     False,
             '_stop':       False,
             '_cfg':        task_cfg,
         }
@@ -236,6 +269,51 @@ class TaskManager:
         with self._lock:
             t = self._tasks.get(task_id)
         return self._public(t) if t else None
+
+    def clear_finished(self) -> int:
+        """删除所有已完成（非运行中）的任务，返回删除数量。"""
+        with self._lock:
+            finished = [tid for tid, t in self._tasks.items()
+                        if t.get('status') != 'running']
+            for tid in finished:
+                del self._tasks[tid]
+        self._save()
+        return len(finished)
+
+    def resume_saved_tasks(self):
+        """服务启动时从 tasks.json 恢复任务，自动继续运行中的任务。"""
+        saved = load_tasks()
+        resumed = 0
+        for tid, data in saved.items():
+            cfg = data.get('_cfg')
+            task = {
+                'id':          tid,
+                'status':      data.get('status', 'stopped'),
+                'count':       data.get('count', 0),
+                'start_time':  data.get('start_time', _now_str()),
+                'last_order':  data.get('last_order'),
+                'logs':        data.get('logs', []),
+                'pid_count':   data.get('pid_count', 1),
+                'current_pid': data.get('current_pid', 1),
+                'resumed':     data.get('status') == 'running',
+                '_stop':       False,
+                '_cfg':        cfg or {},
+            }
+            with self._lock:
+                self._tasks[tid] = task
+            if data.get('status') == 'running' and cfg:
+                self._log(task, '🔄 服务重启后自动恢复，继续执行...')
+                task['status'] = 'running'
+                threading.Thread(target=self._run, args=(tid,), daemon=True).start()
+                resumed += 1
+        if resumed:
+            print(f'[TaskMgr] 已自动恢复 {resumed} 个运行中任务', flush=True)
+
+    def _save(self):
+        """将当前任务状态保存到磁盘。"""
+        with self._lock:
+            tasks = dict(self._tasks)
+        save_tasks(tasks)
 
     # ── 内部 ──────────────────────────────────────────────────────────────────
 
@@ -289,6 +367,7 @@ class TaskManager:
             self._log(task, f'🔄 多PID模式：共 {len(configs)} 个PID，顺序轮换')
 
         send_notification('start', task)
+        self._save()
         start_ts  = time.time()
         cfg_index = 0
 
@@ -298,6 +377,7 @@ class TaskManager:
                 task['status'] = 'timeout'
                 self._log(task, '⏰ 任务已超时')
                 send_notification('timeout', task)
+                self._save()
                 return
 
             # 最大次数检查
@@ -305,6 +385,7 @@ class TaskManager:
                 task['status'] = 'stopped'
                 self._log(task, f'✅ 已达最大次数 {max_count}，停止')
                 send_notification('stop', task)
+                self._save()
                 return
 
             # 多PID轮换：按序选取当前配置
@@ -344,8 +425,10 @@ class TaskManager:
                     task['last_order'] = order_id
                     self._log(task, f'✅ {pid_tag}成功 #{task["count"]}  单号:{order_id or "N/A"}')
                     send_notification('success', task, {'order_id': order_id})
+                    self._save()
                     if not do_loop:
                         task['status'] = 'success'
+                        self._save()
                         return
                 else:
                     err = resp_json.get('msg', str(status))
@@ -356,11 +439,13 @@ class TaskManager:
                 if e.code in (401, 403):
                     task['status'] = 'error'
                     send_notification('error', task, {'msg': f'认证失败 HTTP {e.code}'})
+                    self._save()
                     return
                 # 单PID模式：HTTP错误终止任务；多PID模式：继续下一个PID
                 if not multi_pid:
                     task['status'] = 'error'
                     send_notification('error', task, {'msg': f'HTTP {e.code}'})
+                    self._save()
                     return
 
             except Exception as e:
@@ -369,15 +454,18 @@ class TaskManager:
                 if not multi_pid:
                     task['status'] = 'error'
                     send_notification('error', task, {'msg': str(e)})
+                    self._save()
                     return
 
             time.sleep(interval)
 
         task['status'] = 'stopped'
         send_notification('stop', task)
+        self._save()
 
 
 task_mgr = TaskManager()
+task_mgr.resume_saved_tasks()
 
 
 class APIhdyHandler(SimpleHTTPRequestHandler):
@@ -466,12 +554,13 @@ class APIhdyHandler(SimpleHTTPRequestHandler):
             proxy_paths.add(f'{PANEL_PATH}/local_proxy_login')
 
         # API 端点（需要 Basic Auth）
-        api_post_paths = {'/api/settings', '/api/task/start', '/api/task/stop'}
+        api_post_paths = {'/api/settings', '/api/task/start', '/api/task/stop', '/api/task/clear'}
         if PANEL_PATH:
             api_post_paths.update({
                 f'{PANEL_PATH}/api/settings',
                 f'{PANEL_PATH}/api/task/start',
                 f'{PANEL_PATH}/api/task/stop',
+                f'{PANEL_PATH}/api/task/clear',
             })
 
         if raw_path in proxy_paths:
@@ -556,6 +645,10 @@ class APIhdyHandler(SimpleHTTPRequestHandler):
                     self._send_json({'code': 1, 'msg': f'任务 {tid} 已停止'})
                 else:
                     self._send_json({'code': 0, 'msg': '任务不存在'}, 404)
+
+        elif endpoint == 'clear':
+            n = task_mgr.clear_finished()
+            self._send_json({'code': 1, 'msg': f'已清除 {n} 个已完成任务', 'cleared': n})
         else:
             self.send_error(404, 'Not Found')
 
