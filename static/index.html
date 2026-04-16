@@ -746,11 +746,11 @@
       }
 
       async function autoStartOriginalServerTask(config) {
-        // 既要确认当前点击触发了托管，又要避免同一请求被 fetch/XHR 双路径重复接管。
+        // 既要确认当前点击触发了托管，又要避免同一笔抢购请求同时被 fetch 钩子和 XHR 钩子重复接管。
         if (!pendingOriginalStart || originalAutoStarting) return;
-        clearPendingOriginalStart();
         originalAutoStarting = true;
         try {
+          clearPendingOriginalStart();
           await startServerTask({ configs: [config], source: 'original' });
         } catch (e) {
           updateStatus('原始抢购转服务器失败：' + e.message, 'err');
