@@ -1278,7 +1278,7 @@
           if (!val) { setTaskMsg('❌ 请选择定时时间', 'var(--danger)'); return; }
           const target = new Date(val).getTime();
           const now = Date.now();
-          if (target <= now) { setTaskMsg('❌ 时间必须晚于当前时间', 'var(--danger)'); return; }
+          if (target - now < 3000) { setTaskMsg('❌ 时间必须晚于当前时间至少 3 秒', 'var(--danger)'); return; }
           if (scheduledTimer) clearTimeout(scheduledTimer);
           const delta = target - now;
           const hms = new Date(target).toLocaleTimeString();
