@@ -370,6 +370,15 @@
       const MAX_STORED_CONFIGS = 20;
       const MIN_INTERVAL_SECONDS = 0.2;
       const POLL_INTERVAL_MS = 2000;
+      const ORIGINAL_REQUEST_TIMEOUT_MS = 8000;
+      const PANEL_BUTTON_IDS = new Set([
+        'btn-start-server',
+        'btn-stop-server',
+        'btn-refresh-server',
+        'btn-clear-finished',
+        'btn-login',
+        'btn-save'
+      ]);
       const DEFAULT_CAPTURE_STATE = {
         configs: [],
         product: { name: '', price: '', cycle: '', status: 'idle' }
@@ -503,6 +512,24 @@
         const raw = document.getElementById(elementId).value || String(defaultValue);
         const parsed = defaultValue % 1 === 0 ? parseInt(raw, 10) : parseFloat(raw);
         return Number.isFinite(parsed) ? parsed : defaultValue;
+      }
+
+      function getButtonText(button) {
+        return String((button && (button.innerText || button.textContent)) || '').replace(/\s+/g, '');
+      }
+
+      function refreshOriginalPurchaseButtonMarkers() {
+        document.querySelectorAll('button').forEach((button) => {
+          if (PANEL_BUTTON_IDS.has(button.id)) {
+            delete button.dataset.apihdyOriginalStart;
+            return;
+          }
+          if (getButtonText(button).includes('开始抢购')) {
+            button.dataset.apihdyOriginalStart = '1';
+          } else {
+            delete button.dataset.apihdyOriginalStart;
+          }
+        });
       }
 
       async function apiFetch(path, options = {}) {
@@ -714,11 +741,12 @@
           if (!pendingOriginalStart) return;
           pendingOriginalStart = false;
           updateStatus('未捕获到“原始抢购”请求，请重新点击“开始抢购”', 'err');
-        }, 8000);
+        }, ORIGINAL_REQUEST_TIMEOUT_MS);
         updateStatus('已接管原始抢购，正在同步到服务器...', 'ok');
       }
 
       async function autoStartOriginalServerTask(config) {
+        // 既要确认当前点击触发了托管，又要避免同一请求被 fetch/XHR 双路径重复接管。
         if (!pendingOriginalStart || originalAutoStarting) return;
         clearPendingOriginalStart();
         originalAutoStarting = true;
@@ -917,6 +945,9 @@
         const repeatToggle = document.getElementById('auto-loop-toggle');
         repeatToggle.checked = localStorage.getItem(STORAGE_KEYS.REPEAT) === 'true';
         repeatToggle.onchange = (e) => localStorage.setItem(STORAGE_KEYS.REPEAT, e.target.checked);
+        refreshOriginalPurchaseButtonMarkers();
+        new MutationObserver(() => refreshOriginalPurchaseButtonMarkers())
+          .observe(document.getElementById('app'), { childList: true, subtree: true });
 
         const intervalInput = document.getElementById('server-interval');
         const maxCountInput = document.getElementById('server-max-count');
@@ -968,17 +999,7 @@
           const button = event.target && typeof event.target.closest === 'function'
             ? event.target.closest('button')
             : null;
-          if (!button) return;
-          if ([
-            'btn-start-server',
-            'btn-stop-server',
-            'btn-refresh-server',
-            'btn-clear-finished',
-            'btn-login',
-            'btn-save'
-          ].includes(button.id)) return;
-          const text = String(button.innerText || button.textContent || '').replace(/\s+/g, '');
-          if (text.includes('开始抢购')) {
+          if (button && button.dataset.apihdyOriginalStart === '1') {
             armOriginalServerStart();
           }
         });
