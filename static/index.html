@@ -858,7 +858,7 @@
         if (capturePromise) return capturePromise;
         const pageBtn = findPageActionButton(ACTION_TEXT.START, 'btn-server-start');
         if (!pageBtn) {
-          throw new Error('未找到页面抢购按钮，请先进入商品页并点击获取配置');
+          throw new Error(`未找到页面抢购按钮，请先进入商品页并点击${ACTION_TEXT.GET_CONFIG}`);
         }
         setTaskMsg('⏳ 正在自动捕获抢购请求...', '');
         capturePromise = new Promise((resolve, reject) => {
@@ -866,7 +866,7 @@
           captureResolver = resolve;
           captureRejector = reject;
           captureTimer = setTimeout(() => {
-            resolveCaptureRequest(false, new Error('自动捕获失败，请重新点击「获取配置」后再试'));
+            resolveCaptureRequest(false, new Error(`自动捕获失败，请重新点击「${ACTION_TEXT.GET_CONFIG}」后再试`));
           }, AUTO_CAPTURE_TIMEOUT_MS);
         });
         try {

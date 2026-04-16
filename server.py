@@ -58,6 +58,7 @@ DEFAULT_SETTINGS = {
 
 MAX_TASK_LOGS = 100
 MAX_CAPTURE_CONFIGS = 20
+VALID_PRODUCT_STATUSES = {'idle', 'running', 'stopped'}
 
 
 def load_settings():
@@ -135,7 +136,7 @@ def _normalize_capture_state(data) -> dict:
         'cycle': str((product_in or {}).get('cycle', '')).strip(),
         'status': str((product_in or {}).get('status', 'idle')).strip() or 'idle',
     }
-    if product['status'] not in {'idle', 'running', 'stopped'}:
+    if product['status'] not in VALID_PRODUCT_STATUSES:
         product['status'] = 'idle'
 
     configs = []
