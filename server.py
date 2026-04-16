@@ -193,15 +193,19 @@ class TaskManager:
 
     def start(self, task_cfg: dict) -> str:
         task_id = uuid.uuid4().hex[:8]
+        raw_configs = task_cfg.get('configs')
+        pid_count = len(raw_configs) if (raw_configs and isinstance(raw_configs, list)) else 1
         task = {
-            'id':         task_id,
-            'status':     'running',
-            'count':      0,
-            'start_time': _now_str(),
-            'last_order': None,
-            'logs':       [],
-            '_stop':      False,
-            '_cfg':       task_cfg,
+            'id':          task_id,
+            'status':      'running',
+            'count':       0,
+            'start_time':  _now_str(),
+            'last_order':  None,
+            'logs':        [],
+            'pid_count':   pid_count,
+            'current_pid': 1,
+            '_stop':       False,
+            '_cfg':        task_cfg,
         }
         with self._lock:
             self._tasks[task_id] = task
@@ -250,22 +254,43 @@ class TaskManager:
             task = self._tasks[task_id]
         cfg = task['_cfg']
 
-        url        = cfg.get('url', '').strip()
-        method     = cfg.get('method', 'POST').upper()
-        headers    = dict(cfg.get('headers', {}))
-        body       = cfg.get('body', '')
-        interval   = max(0.2, float(cfg.get('interval', 1.0)))
-        max_count  = int(cfg.get('max_count', 0))   # 0 = 不限
-        timeout_s  = int(cfg.get('timeout', 0))     # 0 = 不限
-        do_loop    = bool(cfg.get('loop', True))
+        # 支持多PID轮换：优先使用 configs 列表，兼容单URL旧格式
+        raw_configs = cfg.get('configs')
+        if raw_configs and isinstance(raw_configs, list) and raw_configs:
+            configs = [
+                {
+                    'url':     str(c.get('url', '')).strip(),
+                    'method':  str(c.get('method', 'POST')).upper(),
+                    'headers': dict(c.get('headers', {})),
+                    'body':    c.get('body', ''),
+                }
+                for c in raw_configs
+            ]
+        else:
+            configs = [{
+                'url':     cfg.get('url', '').strip(),
+                'method':  cfg.get('method', 'POST').upper(),
+                'headers': dict(cfg.get('headers', {})),
+                'body':    cfg.get('body', ''),
+            }]
 
-        if not url:
+        interval  = max(0.2, float(cfg.get('interval', 1.0)))
+        max_count = int(cfg.get('max_count', 0))   # 0 = 不限
+        timeout_s = int(cfg.get('timeout', 0))     # 0 = 不限
+        do_loop   = bool(cfg.get('loop', True))
+        multi_pid = len(configs) > 1
+
+        if not any(c['url'] for c in configs):
             self._log(task, '❌ 任务 URL 为空，无法启动')
             task['status'] = 'error'
             return
 
+        if multi_pid:
+            self._log(task, f'🔄 多PID模式：共 {len(configs)} 个PID，顺序轮换')
+
         send_notification('start', task)
-        start_ts = time.time()
+        start_ts  = time.time()
+        cfg_index = 0
 
         while not task['_stop']:
             # 超时检查
@@ -281,6 +306,19 @@ class TaskManager:
                 self._log(task, f'✅ 已达最大次数 {max_count}，停止')
                 send_notification('stop', task)
                 return
+
+            # 多PID轮换：按序选取当前配置
+            current = configs[cfg_index % len(configs)]
+            pid_no  = cfg_index % len(configs) + 1
+            cfg_index += 1
+            if multi_pid:
+                task['current_pid'] = pid_no
+
+            url     = current['url']
+            method  = current['method']
+            headers = current['headers']
+            body    = current['body']
+            pid_tag = f'[PID {pid_no}/{len(configs)}] ' if multi_pid else ''
 
             try:
                 if isinstance(body, bytes):
@@ -303,27 +341,34 @@ class TaskManager:
                     order_id = (resp_json.get('data') or {}).get('invoiceid', '')
                     task['count'] += 1
                     task['last_order'] = order_id
-                    self._log(task, f'✅ 成功 #{task["count"]}  单号:{order_id or "N/A"}')
+                    self._log(task, f'✅ {pid_tag}成功 #{task["count"]}  单号:{order_id or "N/A"}')
                     send_notification('success', task, {'order_id': order_id})
                     if not do_loop:
                         task['status'] = 'success'
                         return
                 else:
                     err = resp_json.get('msg', str(status))
-                    self._log(task, f'❌ 失败: {err}')
+                    self._log(task, f'❌ {pid_tag}失败: {err}')
 
             except urllib.error.HTTPError as e:
-                self._log(task, f'HTTP {e.code}: {e.reason}')
+                self._log(task, f'{pid_tag}HTTP {e.code}: {e.reason}')
                 if e.code in (401, 403):
                     task['status'] = 'error'
                     send_notification('error', task, {'msg': f'认证失败 HTTP {e.code}'})
                     return
+                # 多PID模式：单个PID的HTTP错误不终止整体任务
+                if not multi_pid:
+                    task['status'] = 'error'
+                    send_notification('error', task, {'msg': f'HTTP {e.code}'})
+                    return
 
             except Exception as e:
-                self._log(task, f'❌ 错误: {e}')
-                task['status'] = 'error'
-                send_notification('error', task, {'msg': str(e)})
-                return
+                self._log(task, f'❌ {pid_tag}错误: {e}')
+                # 多PID模式：单个PID异常不终止整体任务，继续下一个
+                if not multi_pid:
+                    task['status'] = 'error'
+                    send_notification('error', task, {'msg': str(e)})
+                    return
 
             time.sleep(interval)
 
@@ -488,7 +533,11 @@ class APIhdyHandler(SimpleHTTPRequestHandler):
             self._send_json({'code': 1, 'msg': '设置已保存'})
 
         elif endpoint == 'start':
-            if not payload.get('url'):
+            has_url = bool(payload.get('url')) or (
+                bool(payload.get('configs')) and
+                any(c.get('url') for c in payload.get('configs', []))
+            )
+            if not has_url:
                 self._send_json({'code': 0, 'msg': '缺少 url 参数'}, 400)
                 return
             task_id = task_mgr.start(payload)
