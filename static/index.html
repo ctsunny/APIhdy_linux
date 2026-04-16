@@ -553,7 +553,7 @@
       <div class="v5-pane active" id="pane-task">
         <!-- 说明栏 -->
         <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:7px 12px;margin-bottom:10px;font-size:11px;color:#10b981;font-weight:600;">
-          🟢 任务运行于服务器端 · 关闭浏览器 / 重启服务均自动恢复
+          🟢 任务运行于服务器端 · 刷新页面 / 关闭浏览器都不会停止
         </div>
 
         <!-- 商品信息 -->
@@ -561,7 +561,7 @@
           <span class="ai-label">商品信息 🛒</span>
           <div id="product-info-card" class="product-info-card">
             <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:4px 0;">
-              请点击「获取配置」获取商品信息，或在秒杀页面点击「开始抢购」自动捕获
+              请先点击「获取配置」，再点击「开始抢购」
             </div>
           </div>
           <div class="ai-input-group">
@@ -709,6 +709,17 @@
       let capturedRequests = [];   // 多PID列表，每项为一个捕获的请求
       let currentProduct   = { name: '', price: '', cycle: '', status: 'idle' };
       let scheduledTimer   = null;
+      let captureMode      = null;
+      let capturePromise   = null;
+      let captureResolver  = null;
+      let captureRejector  = null;
+      let captureTimer     = null;
+
+      const AUTO_CAPTURE_TIMEOUT_MS = 8000;
+      const ACTION_TEXT = {
+        GET_CONFIG: '获取配置',
+        START: '开始抢购',
+      };
 
       const STORAGE_KEYS = {
         ACCOUNTS: 'ai_accounts',
@@ -762,6 +773,112 @@
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
       }
 
+      function sanitizeCapturedRequest(req) {
+        return {
+          url: String(req?.url || '').trim(),
+          method: String(req?.method || 'POST').toUpperCase(),
+          headers: Object.fromEntries(
+            Object.entries(req?.headers || {}).map(([k, v]) => [String(k), v === null || v === undefined ? '' : String(v)])
+          ),
+          body: req?.body == null ? '' : String(req.body),
+          _key: String(req?._key || ''),
+        };
+      }
+
+      function buildCapturePayload() {
+        return {
+          product: {
+            name: String(currentProduct?.name || ''),
+            price: String(currentProduct?.price || ''),
+            cycle: String(currentProduct?.cycle || ''),
+            status: String(currentProduct?.status || 'idle'),
+          },
+          configs: capturedRequests.map(sanitizeCapturedRequest).map(({ url, method, headers, body }) => ({
+            url, method, headers, body,
+          })),
+        };
+      }
+
+      function applyCaptureState(data) {
+        capturedRequests = Array.isArray(data?.configs)
+          ? data.configs.map(sanitizeCapturedRequest).filter(item => item.url)
+          : [];
+        const product = data?.product || {};
+        currentProduct = {
+          name: String(product.name || ''),
+          price: String(product.price || ''),
+          cycle: String(product.cycle || ''),
+          status: String(product.status || 'idle'),
+        };
+        updateProductInfoUI();
+      }
+
+      async function saveCaptureState(quiet = true) {
+        try {
+          await apiPost('/api/capture', buildCapturePayload());
+        } catch (e) {
+          if (!quiet) setTaskMsg('❌ 保存配置失败: ' + e.message, 'var(--danger)');
+        }
+      }
+
+      async function loadCaptureState() {
+        try {
+          const res = await apiGet('/api/capture');
+          if (res.code === 1) applyCaptureState(res.data);
+        } catch (e) {
+          console.warn('[APIhdy] 加载配置失败:', e.message);
+        }
+      }
+
+      function resolveCaptureRequest(ok, err) {
+        if (captureTimer) {
+          clearTimeout(captureTimer);
+          captureTimer = null;
+        }
+        const resolve = captureResolver;
+        const reject  = captureRejector;
+        captureMode = null;
+        capturePromise = null;
+        captureResolver = null;
+        captureRejector = null;
+        if (ok && resolve) resolve(true);
+        if (!ok && reject) reject(err || new Error('未捕获到抢购请求'));
+      }
+
+      function findPageActionButton(keyword, selfId) {
+        return Array.from(document.querySelectorAll('button')).find(btn =>
+          btn.id !== selfId &&
+          !btn.disabled &&
+          (btn.innerText?.includes(keyword) || btn.textContent?.includes(keyword))
+        );
+      }
+
+      async function ensureCapturedRequests() {
+        if (capturedRequests.length) return true;
+        if (capturePromise) return capturePromise;
+        const pageBtn = findPageActionButton(ACTION_TEXT.START, 'btn-server-start');
+        if (!pageBtn) {
+          throw new Error(`未找到页面抢购按钮，请先进入商品页并点击${ACTION_TEXT.GET_CONFIG}`);
+        }
+        setTaskMsg('⏳ 正在自动捕获抢购请求...', '');
+        capturePromise = new Promise((resolve, reject) => {
+          captureMode = 'capture-only';
+          captureResolver = resolve;
+          captureRejector = reject;
+          captureTimer = setTimeout(() => {
+            resolveCaptureRequest(false, new Error(`自动捕获失败，请重新点击「${ACTION_TEXT.GET_CONFIG}」后再试`));
+          }, AUTO_CAPTURE_TIMEOUT_MS);
+        });
+        try {
+          pageBtn.click();
+          await capturePromise;
+          return capturedRequests.length > 0;
+        } catch (e) {
+          if (captureMode === 'capture-only') resolveCaptureRequest(false, e);
+          throw e;
+        }
+      }
+
       // ── XHR 钩子（捕获请求 + 检测成功） ─────────────────────────────────────
       const XHR        = XMLHttpRequest.prototype;
       const oOpen      = XHR.open;
@@ -786,14 +903,21 @@
                         : (body instanceof URLSearchParams) ? body.toString() : '';
           const _key  = JSON.stringify({ u: this._url, b: _body });
           if (!capturedRequests.some(r => r._key === _key)) {
-            capturedRequests.push({
+            capturedRequests.push(sanitizeCapturedRequest({
               url:     this._url,
               method:  (this._method || 'POST').toUpperCase(),
               headers: Object.assign({}, this._hdrs || {}),
               body:    _body,
               _key:    _key,
-            });
+            }));
             updateProductInfoUI();
+            saveCaptureState(true);
+          }
+          if (captureMode === 'capture-only') {
+            resolveCaptureRequest(true);
+            setTaskMsg('✅ 已捕获抢购请求，正在转交服务器...', 'var(--success)');
+            try { this.abort(); } catch (e) {}
+            return;
           }
           this.addEventListener('load', () => {
             try {
@@ -822,7 +946,7 @@
         const card = document.getElementById('product-info-card');
         if (!card) return;
         if (!currentProduct.name && !capturedRequests.length) {
-          card.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:4px 0;">请点击「获取配置」获取商品信息，或在秒杀页面点击「开始抢购」自动捕获</div>';
+          card.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:4px 0;">请先点击「获取配置」，再点击「开始抢购」</div>';
           return;
         }
         const st = currentProduct.status;
@@ -897,6 +1021,7 @@
         currentProduct.price = p ? (/^\d+(\.\d+)?$/.test(p) ? '¥' + parseFloat(p).toFixed(2) : p) : '';
         currentProduct.cycle = found.cycle;
         updateProductInfoUI();
+        saveCaptureState(true);
         return true;
       }
 
@@ -991,9 +1116,13 @@
         const container = document.getElementById('task-list-container');
         if (!container) return;
         if (!tasks || !tasks.length) {
-          container.innerHTML = '<div id="task-list-empty">暂无任务 · 请捕获请求后点击启动</div>';
+          container.innerHTML = '<div id="task-list-empty">暂无任务 · 请先获取配置再开始抢购</div>';
           setModuleState('idle');
           updateStatus('系统就绪');
+          if (currentProduct.status === 'running') {
+            currentProduct.status = 'idle';
+            updateProductInfoUI();
+          }
           return;
         }
         // 最新任务排前面
@@ -1198,14 +1327,12 @@
             currentProduct.price = info.price;
             currentProduct.cycle = info.cycle;
             updateProductInfoUI();
+            saveCaptureState(true);
             setTaskMsg('✅ 已从页面提取商品信息', 'var(--success)');
             return;
           }
           // 尝试点击原始页面的「获取配置」按钮
-          const pageBtn = Array.from(document.querySelectorAll('button')).find(b =>
-            b.id !== 'btn-get-config' &&
-            (b.innerText?.includes('获取配置') || b.textContent?.includes('获取配置'))
-          );
+          const pageBtn = findPageActionButton(ACTION_TEXT.GET_CONFIG, 'btn-get-config');
           if (pageBtn) {
             pageBtn.click();
             setTaskMsg('⏳ 正在从页面获取配置，请稍候...', '');
@@ -1216,26 +1343,30 @@
 
         // ── 开始抢购 ──
         document.getElementById('btn-server-start').onclick = async () => {
-          if (!capturedRequests.length) {
-            setTaskMsg('❌ 尚未捕获请求，请先点击「获取配置」或在商品页面触发一次抢购', 'var(--danger)');
-            return;
-          }
-          const payload = {
-            configs:   capturedRequests.map(({ url, method, headers, body }) => ({ url, method, headers, body })),
-            interval:  parseFloat(document.getElementById('task-interval').value)  || 1,
-            max_count: parseInt(document.getElementById('task-max-count').value)    || 0,
-            timeout:   parseInt(document.getElementById('task-timeout').value)      || 0,
-            loop:      document.getElementById('task-loop').checked,
-          };
           try {
+            await ensureCapturedRequests();
+            if (!capturedRequests.length) {
+              setTaskMsg('❌ 尚未捕获到抢购请求，请重新点击「获取配置」后再试', 'var(--danger)');
+              return;
+            }
+            await saveCaptureState(true);
+            const payload = {
+              configs:   capturedRequests.map(({ url, method, headers, body }) => ({ url, method, headers, body })),
+              interval:  parseFloat(document.getElementById('task-interval').value)  || 1,
+              max_count: parseInt(document.getElementById('task-max-count').value)    || 0,
+              timeout:   parseInt(document.getElementById('task-timeout').value)      || 0,
+              loop:      document.getElementById('task-loop').checked,
+            };
             const res = await apiPost('/api/task/start', payload);
             if (res.code === 1) {
-              setTaskMsg(`✅ 任务 ${res.task_id} 已在服务器启动`, 'var(--success)');
+              currentProduct.status = 'running';
+              updateProductInfoUI();
+              setTaskMsg(`✅ 任务 ${res.task_id} 已在服务器启动，刷新页面也不会停止`, 'var(--success)');
             } else {
               setTaskMsg('❌ ' + (res.msg || '启动失败'), 'var(--danger)');
             }
           } catch (e) {
-            setTaskMsg('❌ 通讯失败: ' + e.message, 'var(--danger)');
+            setTaskMsg('❌ ' + e.message, 'var(--danger)');
           }
         };
 
@@ -1339,9 +1470,10 @@
         // 初始加载设置
         loadSettingsToUI();
 
-        // 初始获取所有任务（含服务器自动恢复的任务）并启动全量轮询
+        // 初始恢复已保存配置，再获取所有任务（含服务器自动恢复的任务）
         (async () => {
           try {
+            await loadCaptureState();
             const res = await apiGet('/api/task/status');
             if (res.code === 1 && Array.isArray(res.data)) {
               renderTaskList(res.data);

@@ -21,6 +21,7 @@ BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH  = os.path.join(BASE_DIR, 'config.json')
 SETTINGS_PATH = os.path.join(BASE_DIR, 'settings.json')
 TASKS_PATH    = os.path.join(BASE_DIR, 'tasks.json')
+CAPTURE_STATE_PATH = os.path.join(BASE_DIR, 'capture_state.json')
 
 
 def load_config():
@@ -56,6 +57,8 @@ DEFAULT_SETTINGS = {
 
 
 MAX_TASK_LOGS = 100
+MAX_CAPTURE_CONFIGS = 20
+VALID_PRODUCT_STATUSES = {'idle', 'running', 'stopped'}
 
 
 def load_settings():
@@ -113,6 +116,68 @@ def load_tasks() -> dict:
             return json.load(f)
     except Exception:
         return {}
+
+
+def _default_capture_state() -> dict:
+    return {
+        'configs': [],
+        'product': {'name': '', 'price': '', 'cycle': '', 'status': 'idle'},
+        'updated_at': None,
+    }
+
+
+def _normalize_capture_state(data) -> dict:
+    product_in = data.get('product') if isinstance(data, dict) else {}
+    configs_in = data.get('configs') if isinstance(data, dict) else []
+
+    product = {
+        'name': str((product_in or {}).get('name', '')).strip(),
+        'price': str((product_in or {}).get('price', '')).strip(),
+        'cycle': str((product_in or {}).get('cycle', '')).strip(),
+        'status': str((product_in or {}).get('status', 'idle')).strip() or 'idle',
+    }
+    if product['status'] not in VALID_PRODUCT_STATUSES:
+        product['status'] = 'idle'
+
+    configs = []
+    if isinstance(configs_in, list):
+        for item in configs_in[:MAX_CAPTURE_CONFIGS]:
+            if not isinstance(item, dict):
+                continue
+            headers = {}
+            raw_headers = item.get('headers', {})
+            if isinstance(raw_headers, dict):
+                headers = {
+                    str(k): '' if v is None else str(v)
+                    for k, v in raw_headers.items()
+                }
+            configs.append({
+                'url': str(item.get('url', '')).strip(),
+                'method': str(item.get('method', 'POST')).upper().strip() or 'POST',
+                'headers': headers,
+                'body': '' if item.get('body') is None else str(item.get('body')),
+            })
+
+    return {'configs': configs, 'product': product, 'updated_at': _now_str()}
+
+
+def load_capture_state() -> dict:
+    if not os.path.exists(CAPTURE_STATE_PATH):
+        return _default_capture_state()
+    try:
+        with open(CAPTURE_STATE_PATH, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        merged = _default_capture_state()
+        merged.update(_normalize_capture_state(data))
+        return merged
+    except Exception:
+        return _default_capture_state()
+
+
+def save_capture_state(data):
+    state = _normalize_capture_state(data or {})
+    with open(CAPTURE_STATE_PATH, 'w', encoding='utf-8') as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
 
 
 # ── 通知 ──────────────────────────────────────────────────────────────────────
@@ -508,9 +573,13 @@ class APIhdyHandler(SimpleHTTPRequestHandler):
         raw_path = self.path.split('?')[0].split('#')[0]
 
         # API 端点（需要 Basic Auth）
-        api_paths = {'/api/settings', '/api/task/status'}
+        api_paths = {'/api/settings', '/api/task/status', '/api/capture'}
         if PANEL_PATH:
-            api_paths.update({f'{PANEL_PATH}/api/settings', f'{PANEL_PATH}/api/task/status'})
+            api_paths.update({
+                f'{PANEL_PATH}/api/settings',
+                f'{PANEL_PATH}/api/task/status',
+                f'{PANEL_PATH}/api/capture',
+            })
         if raw_path in api_paths:
             if not self._check_basic_auth():
                 self._request_auth()
@@ -554,13 +623,14 @@ class APIhdyHandler(SimpleHTTPRequestHandler):
             proxy_paths.add(f'{PANEL_PATH}/local_proxy_login')
 
         # API 端点（需要 Basic Auth）
-        api_post_paths = {'/api/settings', '/api/task/start', '/api/task/stop', '/api/task/clear'}
+        api_post_paths = {'/api/settings', '/api/task/start', '/api/task/stop', '/api/task/clear', '/api/capture'}
         if PANEL_PATH:
             api_post_paths.update({
                 f'{PANEL_PATH}/api/settings',
                 f'{PANEL_PATH}/api/task/start',
                 f'{PANEL_PATH}/api/task/stop',
                 f'{PANEL_PATH}/api/task/clear',
+                f'{PANEL_PATH}/api/capture',
             })
 
         if raw_path in proxy_paths:
@@ -589,6 +659,8 @@ class APIhdyHandler(SimpleHTTPRequestHandler):
         endpoint = raw_path.split('/')[-1]          # 'settings' 或 'status'
         if endpoint == 'settings':
             self._send_json({'code': 1, 'data': load_settings()})
+        elif endpoint == 'capture':
+            self._send_json({'code': 1, 'data': load_capture_state()})
         elif endpoint == 'status':
             # ?id=<task_id> 返回单个任务；否则返回全部
             qs   = self.path.split('?', 1)[1] if '?' in self.path else ''
@@ -621,6 +693,10 @@ class APIhdyHandler(SimpleHTTPRequestHandler):
         if endpoint == 'settings':
             save_settings(payload)
             self._send_json({'code': 1, 'msg': '设置已保存'})
+
+        elif endpoint == 'capture':
+            save_capture_state(payload)
+            self._send_json({'code': 1, 'msg': '配置已保存', 'data': load_capture_state()})
 
         elif endpoint == 'start':
             has_url = bool(payload.get('url')) or (
