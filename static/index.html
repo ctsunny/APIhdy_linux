@@ -712,7 +712,7 @@
       let captureMode      = null;
       let capturePromise   = null;
       let captureResolver  = null;
-      let captureRejecter  = null;
+      let captureRejector  = null;
       let captureTimer     = null;
 
       const CAPTURE_REQUEST_TIMEOUT_MS = 8000;
@@ -836,11 +836,11 @@
           captureTimer = null;
         }
         const resolve = captureResolver;
-        const reject  = captureRejecter;
+        const reject  = captureRejector;
         captureMode = null;
         capturePromise = null;
         captureResolver = null;
-        captureRejecter = null;
+        captureRejector = null;
         if (ok && resolve) resolve(true);
         if (!ok && reject) reject(err || new Error('未捕获到抢购请求'));
       }
@@ -864,7 +864,7 @@
         capturePromise = new Promise((resolve, reject) => {
           captureMode = 'capture-only';
           captureResolver = resolve;
-          captureRejecter = reject;
+          captureRejector = reject;
           captureTimer = setTimeout(() => {
             resolveCaptureRequest(false, new Error('自动捕获失败，请重新点击「获取配置」后再试'));
           }, CAPTURE_REQUEST_TIMEOUT_MS);
