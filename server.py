@@ -273,7 +273,7 @@ def _derive_settle_config(add_to_shop_cfg: dict) -> dict:
             content_type = str(value).lower()
             break
     if 'application/x-www-form-urlencoded' in content_type:
-        body = 'payment=&pos%5B%5D=0&checkout=0'
+        body = urllib.parse.urlencode([('payment', ''), ('pos[]', 0), ('checkout', 0)])
     else:
         if not content_type:
             headers['Content-Type'] = 'application/json;charset=UTF-8'
@@ -602,6 +602,7 @@ class TaskManager:
 
             if cart_flow:
                 try:
+                    retry_cycle = False
                     add_resp = self._execute_request(cart_flow['add_to_shop'])
                     if _request_succeeded(add_resp):
                         self._log(task, '🛒 添加购物车成功，开始结算')
@@ -612,22 +613,22 @@ class TaskManager:
                                 self._log(task, '🏷️ 优惠码应用成功')
                             else:
                                 self._log(task, f'❌ 优惠码失败: {_response_message(promo_resp) or "未知错误"}')
-                                time.sleep(interval)
-                                continue
-                        settle_resp = self._execute_request(cart_flow['settle'])
-                        if _request_succeeded(settle_resp):
-                            order_id = _response_invoice_id(settle_resp)
-                            task['count'] += 1
-                            task['last_order'] = order_id
-                            self._log(task, f'✅ 成功 #{task["count"]}  单号:{order_id or "N/A"}')
-                            send_notification('success', task, {'order_id': order_id})
-                            self._save()
-                            if not do_loop:
-                                task['status'] = 'success'
+                                retry_cycle = True
+                        if not retry_cycle:
+                            settle_resp = self._execute_request(cart_flow['settle'])
+                            if _request_succeeded(settle_resp):
+                                order_id = _response_invoice_id(settle_resp)
+                                task['count'] += 1
+                                task['last_order'] = order_id
+                                self._log(task, f'✅ 成功 #{task["count"]}  单号:{order_id or "N/A"}')
+                                send_notification('success', task, {'order_id': order_id})
                                 self._save()
-                                return
-                        else:
-                            self._log(task, f'❌ 结算失败: {_response_message(settle_resp) or "未知错误"}')
+                                if not do_loop:
+                                    task['status'] = 'success'
+                                    self._save()
+                                    return
+                            else:
+                                self._log(task, f'❌ 结算失败: {_response_message(settle_resp) or "未知错误"}')
                     else:
                         self._log(task, f'❌ 添加购物车失败: {_response_message(add_resp) or "未知错误"}')
 
