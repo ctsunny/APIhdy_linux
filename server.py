@@ -54,14 +54,17 @@ DEFAULT_SETTINGS = {
 }
 
 
+MAX_TASK_LOGS = 100
+
+
 def load_settings():
     if not os.path.exists(SETTINGS_PATH):
-        return {k: v for k, v in DEFAULT_SETTINGS.items()}
+        return DEFAULT_SETTINGS.copy()
     try:
         with open(SETTINGS_PATH, 'r', encoding='utf-8') as f:
             saved = json.load(f)
         # Deep-merge with defaults so new keys are always present
-        merged = {k: v for k, v in DEFAULT_SETTINGS.items()}
+        merged = DEFAULT_SETTINGS.copy()
         merged.update(saved)
         # Ensure sub-dicts exist
         for sub in ('notify', 'notify_events'):
@@ -72,7 +75,7 @@ def load_settings():
                 merged['notify'][ch] = DEFAULT_SETTINGS['notify'][ch]
         return merged
     except Exception:
-        return {k: v for k, v in DEFAULT_SETTINGS.items()}
+        return DEFAULT_SETTINGS.copy()
 
 
 def save_settings(data):
@@ -129,8 +132,8 @@ def _send_bark(cfg, msg, title='APIhdy通知'):
         return
     try:
         url = (f'{server}/{urllib.parse.quote(key, safe="")}'
-               f'/{urllib.parse.quote(title, safe="")}'
-               f'/{urllib.parse.quote(msg, safe="")}')
+               f'/{urllib.parse.quote(title)}'
+               f'/{urllib.parse.quote(msg)}')
         urllib.request.urlopen(urllib.request.Request(url, method='GET'), timeout=10)
     except Exception as e:
         print(f'[Notify][Bark] {e}', flush=True)
@@ -239,7 +242,7 @@ class TaskManager:
     def _log(self, task: dict, msg: str):
         entry = f'[{datetime.datetime.now().strftime("%H:%M:%S")}] {msg}'
         task['logs'].append(entry)
-        task['logs'] = task['logs'][-100:]
+        task['logs'] = task['logs'][-MAX_TASK_LOGS:]
         print(f'[Task {task["id"]}] {msg}', flush=True)
 
     def _run(self, task_id: str):
@@ -280,7 +283,12 @@ class TaskManager:
                 return
 
             try:
-                body_bytes = body.encode('utf-8') if isinstance(body, str) else (body or b'')
+                if isinstance(body, bytes):
+                    body_bytes = body
+                elif isinstance(body, str):
+                    body_bytes = body.encode('utf-8')
+                else:
+                    body_bytes = b''
                 req = urllib.request.Request(
                     url=url,
                     data=body_bytes if method != 'GET' else None,

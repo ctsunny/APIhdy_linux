@@ -833,9 +833,10 @@
         // 日志
         const logBox = document.getElementById('task-log-box');
         if (task.logs && task.logs.length) {
-          logBox.innerHTML = task.logs.slice(-30).map(l =>
-            `<div>${l.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</div>`
-          ).join('');
+          logBox.innerHTML = task.logs.slice(-30).map(l => {
+            const safe = l.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            return `<div>${safe}</div>`;
+          }).join('');
           logBox.scrollTop = logBox.scrollHeight;
         }
 
@@ -856,7 +857,9 @@
           try {
             const res = await apiGet(`/api/task/status?id=${taskId}`);
             if (res.code === 1) updateTaskUI(res.data);
-          } catch (e) {}
+          } catch (e) {
+            console.warn('[APIhdy] 轮询任务状态失败:', e.message);
+          }
         }, 2000);
       }
 
@@ -1043,7 +1046,9 @@
                 setTaskMsg(`🟢 已恢复监听任务 ${running.id}`, 'var(--success)');
               }
             }
-          } catch (e) {}
+          } catch (e) {
+            console.warn('[APIhdy] 恢复任务状态失败:', e.message);
+          }
         })();
 
         console.log('%c APIhdy V5 Supreme Loaded ', 'background: #06b6d4; color: #000; font-weight: bold;');
