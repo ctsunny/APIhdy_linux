@@ -367,6 +367,8 @@
         MAX_COUNT: 'ai_server_max_count',
         TIMEOUT: 'ai_server_timeout'
       };
+      const MAX_STORED_CONFIGS = 20;
+      const MIN_INTERVAL_SECONDS = 0.2;
       const DEFAULT_CAPTURE_STATE = {
         configs: [],
         product: { name: '', price: '', cycle: '', status: 'idle' }
@@ -509,8 +511,10 @@
         if (!configs.length) {
           lines.push('请在页面中先点击一次原始“开始抢购”，系统会自动抓取请求并保存到服务器。');
         } else {
-          const preview = configs.slice(-3).map((cfg, index) => {
-            const label = `PID ${configs.length - Math.min(2, configs.length - 1) + index}`;
+          const previewItems = configs.slice(-3);
+          const previewStart = configs.length - previewItems.length + 1;
+          const preview = previewItems.map((cfg, index) => {
+            const label = `PID ${previewStart + index}`;
             return `${label}：${escapeHtml(cfg.method || 'POST')} ${escapeHtml((cfg.url || '').replace(BASE, ''))}`;
           });
           lines.push(preview.join('<br>'));
@@ -601,7 +605,7 @@
         list.push(normalized);
         captureState = {
           ...captureState,
-          configs: list.slice(-20),
+          configs: list.slice(-MAX_STORED_CONFIGS),
           product: getProductSnapshot(),
           updated_at: new Date().toLocaleString()
         };
@@ -631,7 +635,7 @@
         const timeout = parseInt(document.getElementById('server-timeout').value || '0', 10) || 0;
         return {
           configs: Array.isArray(captureState.configs) ? captureState.configs : [],
-          interval: Math.max(0.2, interval),
+          interval: Math.max(MIN_INTERVAL_SECONDS, interval),
           max_count: Math.max(0, maxCount),
           timeout: Math.max(0, timeout),
           loop: document.getElementById('auto-loop-toggle').checked
