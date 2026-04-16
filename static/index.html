@@ -311,14 +311,14 @@
         </div>
       </div>
 
-      <!-- 通知 & 服务器任务 -->
+      <!-- 通知 & 原始抢购托管 -->
       <div class="ai-section">
-        <span class="ai-label">通知 & 服务器任务 ⚙</span>
+        <span class="ai-label">通知 & 原始抢购托管 ⚙</span>
         <div class="ai-input-group">
           <input type="text" id="qmsg-token" class="ai-input" placeholder="Qmsg酱 Token (通知)">
         </div>
         <div class="toggle-row">
-          <span style="font-size:12px;color:var(--text-main);">服务器端持续循环抢购</span>
+          <span style="font-size:12px;color:var(--text-main);">点击原始“开始抢购”后自动转为服务器持续抢购</span>
           <label class="switch">
             <input type="checkbox" id="auto-loop-toggle">
             <span class="slider"></span>
@@ -332,7 +332,7 @@
           <input type="number" id="server-timeout" class="ai-input" placeholder="任务超时秒数（0=不限）" min="0" step="1">
         </div>
         <div class="ai-input-group" style="margin-bottom:0;">
-          <button id="btn-start-server" class="ai-btn btn-primary">启动服务器任务</button>
+          <button id="btn-start-server" class="ai-btn btn-primary" style="display:none;">启动服务器任务</button>
           <button id="btn-stop-server" class="ai-btn btn-ghost">停止全部</button>
         </div>
       </div>
@@ -340,7 +340,7 @@
       <div class="ai-section">
         <span class="ai-label">服务器状态 📡</span>
         <div id="capture-summary" style="font-size:12px;color:var(--text-main);line-height:1.6;">
-          尚未捕获抢购请求，请先在页面内触发一次抢购请求。
+          尚未捕获原始抢购请求，请先点击页面原始“开始抢购”。
         </div>
         <div class="ai-input-group" style="margin-top:10px;margin-bottom:10px;">
           <button id="btn-refresh-server" class="ai-btn btn-ghost">刷新状态</button>
@@ -381,6 +381,9 @@
       let isCaptureSaving = false;
       let captureSavePending = false;
       let pollTimer = null;
+      let pendingOriginalStart = false;
+      let pendingOriginalStartTimer = null;
+      let originalAutoStarting = false;
 
       window.onload = () => {
         const loader = document.getElementById('v4-loader');
@@ -522,12 +525,12 @@
         const configs = Array.isArray(captureState.configs) ? captureState.configs : [];
         const product = captureState.product || DEFAULT_CAPTURE_STATE.product;
         const lines = [
-          `已捕获 <b>${configs.length}</b> 个服务器 PID`,
+          `已记录 <b>${configs.length}</b> 个原始抢购 PID`,
           product.name ? `商品：${escapeHtml(product.name)}` : '商品：等待页面捕获',
           captureState.updated_at ? `最近同步：${escapeHtml(captureState.updated_at)}` : '最近同步：暂无'
         ];
         if (!configs.length) {
-          lines.push('请在页面中先点击一次原始“开始抢购”，系统会自动抓取请求并保存到服务器。');
+          lines.push('请点击页面原始“开始抢购”，系统会自动抓取请求并立即转为服务器任务。');
         } else {
           const previewItems = configs.slice(-3);
           const previewStart = configs.length - previewItems.length + 1;
@@ -538,14 +541,13 @@
           lines.push(preview.join('<br>'));
         }
         document.getElementById('capture-summary').innerHTML = lines.join('<br>');
-        document.getElementById('btn-start-server').disabled = !configs.length;
       }
 
       function renderTaskList() {
         const wrap = document.getElementById('task-list');
         const tasks = Array.isArray(taskState) ? taskState.slice().sort(compareTaskStartTime) : [];
         if (!tasks.length) {
-          wrap.innerHTML = '<div style="font-size:12px;color:var(--text-main);padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.04);">暂无服务器任务；抓到一次请求后即可在这里启动后台抢购。</div>';
+          wrap.innerHTML = '<div style="font-size:12px;color:var(--text-main);padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.04);">暂无服务器任务；点击页面原始“开始抢购”后会自动在服务器接管。</div>';
           return;
         }
         wrap.innerHTML = tasks.map((task) => {
@@ -628,8 +630,9 @@
           updated_at: new Date().toLocaleString()
         };
         renderCaptureState();
-        updateStatus(`已捕获服务器请求，当前共 ${captureState.configs.length} 个 PID`, 'ok');
+        updateStatus(`已捕获原始抢购请求，当前共 ${captureState.configs.length} 个 PID`, 'ok');
         saveCaptureState();
+        autoStartOriginalServerTask(normalized);
       }
 
       async function refreshServerState(showMessage = false) {
@@ -647,12 +650,12 @@
         }
       }
 
-      function getServerTaskPayload() {
+      function getServerTaskPayload(configsOverride) {
         const interval = getInputNumberValue('server-interval', 1);
         const maxCount = getInputNumberValue('server-max-count', 0);
         const timeout = getInputNumberValue('server-timeout', 0);
         return {
-          configs: Array.isArray(captureState.configs) ? captureState.configs : [],
+          configs: Array.isArray(configsOverride) ? configsOverride : (Array.isArray(captureState.configs) ? captureState.configs : []),
           interval: Math.max(MIN_INTERVAL_SECONDS, interval),
           max_count: Math.max(0, maxCount),
           timeout: Math.max(0, timeout),
@@ -660,23 +663,72 @@
         };
       }
 
-      async function startServerTask() {
+      async function startServerTask(options = {}) {
+        const { configs, source = 'panel' } = options;
         const running = taskState.filter((task) => task.status === 'running');
         if (running.length) {
-          updateStatus('已有服务器任务在运行，请先停止后再启动', 'err');
-          return;
+          updateStatus(
+            source === 'original'
+              ? '服务器任务已在运行，本次原始抢购不会重复创建'
+              : '已有服务器任务在运行，请先停止后再启动',
+            source === 'original' ? 'ok' : 'err'
+          );
+          return false;
         }
-        const payload = getServerTaskPayload();
+        const payload = getServerTaskPayload(configs);
         if (!payload.configs.length) {
-          updateStatus('请先在页面内触发一次抢购请求，捕获 PID 后再启动', 'err');
-          return;
+          updateStatus(
+            source === 'original'
+              ? '未捕获到原始抢购请求，请重试'
+              : '请先在页面内触发一次抢购请求，捕获 PID 后再启动',
+            'err'
+          );
+          return false;
         }
         const result = await apiFetch('/api/task/start', {
           method: 'POST',
           body: JSON.stringify(payload)
         });
-        updateStatus(`服务器任务已启动：${result.task_id}`, 'ok');
+        updateStatus(
+          source === 'original'
+            ? `原始抢购已转为服务器运行：${result.task_id}`
+            : `服务器任务已启动：${result.task_id}`,
+          'ok'
+        );
         await refreshServerState();
+        return true;
+      }
+
+      function clearPendingOriginalStart() {
+        pendingOriginalStart = false;
+        if (pendingOriginalStartTimer) {
+          clearTimeout(pendingOriginalStartTimer);
+          pendingOriginalStartTimer = null;
+        }
+      }
+
+      function armOriginalServerStart() {
+        clearPendingOriginalStart();
+        pendingOriginalStart = true;
+        pendingOriginalStartTimer = setTimeout(() => {
+          if (!pendingOriginalStart) return;
+          pendingOriginalStart = false;
+          updateStatus('未捕获到原始抢购请求，请重新点击“开始抢购”', 'err');
+        }, 8000);
+        updateStatus('已接管原始抢购，正在同步到服务器...', 'ok');
+      }
+
+      async function autoStartOriginalServerTask(config) {
+        if (!pendingOriginalStart || originalAutoStarting) return;
+        clearPendingOriginalStart();
+        originalAutoStarting = true;
+        try {
+          await startServerTask({ configs: [config], source: 'original' });
+        } catch (e) {
+          updateStatus('原始抢购转服务器失败: ' + e.message, 'err');
+        } finally {
+          originalAutoStarting = false;
+        }
       }
 
       async function stopAllServerTasks(showMessage = true) {
@@ -912,6 +964,24 @@
             updateStatus('停止失败: ' + e.message, 'err');
           }
         };
+        document.addEventListener('click', (event) => {
+          const button = event.target && typeof event.target.closest === 'function'
+            ? event.target.closest('button')
+            : null;
+          if (!button) return;
+          if ([
+            'btn-start-server',
+            'btn-stop-server',
+            'btn-refresh-server',
+            'btn-clear-finished',
+            'btn-login',
+            'btn-save'
+          ].includes(button.id)) return;
+          const text = String(button.innerText || button.textContent || '').replace(/\s+/g, '');
+          if (text.includes('开始抢购')) {
+            armOriginalServerStart();
+          }
+        });
 
         refreshServerState(true).catch((e) => updateStatus('读取服务器状态失败: ' + e.message, 'err'));
         pollTimer = setInterval(() => {
