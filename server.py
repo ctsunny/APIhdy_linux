@@ -117,13 +117,6 @@ def load_tasks() -> dict:
         return {}
 
 
-DEFAULT_CAPTURE_STATE = {
-    'configs': [],
-    'product': {'name': '', 'price': '', 'cycle': '', 'status': 'idle'},
-    'updated_at': None,
-}
-
-
 def _default_capture_state() -> dict:
     return {
         'configs': [],

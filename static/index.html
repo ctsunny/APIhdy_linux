@@ -715,7 +715,7 @@
       let captureRejector  = null;
       let captureTimer     = null;
 
-      const CAPTURE_REQUEST_TIMEOUT_MS = 8000;
+      const AUTO_CAPTURE_TIMEOUT_MS = 8000;
       const ACTION_TEXT = {
         GET_CONFIG: '获取配置',
         START: '开始抢购',
@@ -867,11 +867,16 @@
           captureRejector = reject;
           captureTimer = setTimeout(() => {
             resolveCaptureRequest(false, new Error('自动捕获失败，请重新点击「获取配置」后再试'));
-          }, CAPTURE_REQUEST_TIMEOUT_MS);
+          }, AUTO_CAPTURE_TIMEOUT_MS);
         });
-        pageBtn.click();
-        await capturePromise;
-        return capturedRequests.length > 0;
+        try {
+          pageBtn.click();
+          await capturePromise;
+          return capturedRequests.length > 0;
+        } catch (e) {
+          if (captureMode === 'capture-only') resolveCaptureRequest(false, e);
+          throw e;
+        }
       }
 
       // ── XHR 钩子（捕获请求 + 检测成功） ─────────────────────────────────────
@@ -911,9 +916,7 @@
           if (captureMode === 'capture-only') {
             resolveCaptureRequest(true);
             setTaskMsg('✅ 已捕获抢购请求，正在转交服务器...', 'var(--success)');
-            setTimeout(() => {
-              try { this.abort(); } catch (e) {}
-            }, 0);
+            try { this.abort(); } catch (e) {}
             return;
           }
           this.addEventListener('load', () => {
