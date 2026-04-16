@@ -308,9 +308,10 @@ class TaskManager:
                 return
 
             # 多PID轮换：按序选取当前配置
-            current = configs[cfg_index % len(configs)]
-            pid_no  = cfg_index % len(configs) + 1
-            cfg_index += 1
+            current_idx = cfg_index % len(configs)
+            current     = configs[current_idx]
+            pid_no      = current_idx + 1
+            cfg_index  += 1
             if multi_pid:
                 task['current_pid'] = pid_no
 
@@ -356,7 +357,7 @@ class TaskManager:
                     task['status'] = 'error'
                     send_notification('error', task, {'msg': f'认证失败 HTTP {e.code}'})
                     return
-                # 多PID模式：单个PID的HTTP错误不终止整体任务
+                # 单PID模式：HTTP错误终止任务；多PID模式：继续下一个PID
                 if not multi_pid:
                     task['status'] = 'error'
                     send_notification('error', task, {'msg': f'HTTP {e.code}'})
@@ -364,7 +365,7 @@ class TaskManager:
 
             except Exception as e:
                 self._log(task, f'❌ {pid_tag}错误: {e}')
-                # 多PID模式：单个PID异常不终止整体任务，继续下一个
+                # 单PID模式：异常终止任务；多PID模式：跳过当前PID，继续下一个
                 if not multi_pid:
                     task['status'] = 'error'
                     send_notification('error', task, {'msg': str(e)})
