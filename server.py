@@ -602,7 +602,7 @@ class TaskManager:
 
             if cart_flow:
                 try:
-                    retry_cycle = False
+                    skip_settle = False
                     add_resp = self._execute_request(cart_flow['add_to_shop'])
                     if _request_succeeded(add_resp):
                         self._log(task, '🛒 添加购物车成功，开始结算')
@@ -613,8 +613,8 @@ class TaskManager:
                                 self._log(task, '🏷️ 优惠码应用成功')
                             else:
                                 self._log(task, f'❌ 优惠码失败: {_response_message(promo_resp) or "未知错误"}')
-                                retry_cycle = True
-                        if not retry_cycle:
+                                skip_settle = True
+                        if not skip_settle:
                             settle_resp = self._execute_request(cart_flow['settle'])
                             if _request_succeeded(settle_resp):
                                 order_id = _response_invoice_id(settle_resp)
@@ -634,11 +634,10 @@ class TaskManager:
 
                 except urllib.error.HTTPError as e:
                     self._log(task, f'HTTP {e.code}: {e.reason}')
+                    task['status'] = 'error'
                     if e.code in (401, 403):
-                        task['status'] = 'error'
                         send_notification('error', task, {'msg': f'认证失败 HTTP {e.code}'})
                     else:
-                        task['status'] = 'error'
                         send_notification('error', task, {'msg': f'HTTP {e.code}'})
                     self._save()
                     return
