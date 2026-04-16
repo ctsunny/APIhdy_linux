@@ -57,6 +57,7 @@ DEFAULT_SETTINGS = {
 
 
 MAX_TASK_LOGS = 100
+MAX_CAPTURE_CONFIGS = 20
 
 
 def load_settings():
@@ -146,7 +147,7 @@ def _normalize_capture_state(data) -> dict:
 
     configs = []
     if isinstance(configs_in, list):
-        for item in configs_in[:20]:
+        for item in configs_in[:MAX_CAPTURE_CONFIGS]:
             if not isinstance(item, dict):
                 continue
             headers = {}

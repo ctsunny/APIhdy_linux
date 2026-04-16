@@ -710,9 +710,16 @@
       let currentProduct   = { name: '', price: '', cycle: '', status: 'idle' };
       let scheduledTimer   = null;
       let captureMode      = null;
+      let capturePromise   = null;
       let captureResolver  = null;
       let captureRejecter  = null;
       let captureTimer     = null;
+
+      const CAPTURE_REQUEST_TIMEOUT_MS = 8000;
+      const ACTION_TEXT = {
+        GET_CONFIG: '获取配置',
+        START: '开始抢购',
+      };
 
       const STORAGE_KEYS = {
         ACCOUNTS: 'ai_accounts',
@@ -771,7 +778,7 @@
           url: String(req?.url || '').trim(),
           method: String(req?.method || 'POST').toUpperCase(),
           headers: Object.fromEntries(
-            Object.entries(req?.headers || {}).map(([k, v]) => [String(k), v == null ? '' : String(v)])
+            Object.entries(req?.headers || {}).map(([k, v]) => [String(k), v === null || v === undefined ? '' : String(v)])
           ),
           body: req?.body == null ? '' : String(req.body),
           _key: String(req?._key || ''),
@@ -831,6 +838,7 @@
         const resolve = captureResolver;
         const reject  = captureRejecter;
         captureMode = null;
+        capturePromise = null;
         captureResolver = null;
         captureRejecter = null;
         if (ok && resolve) resolve(true);
@@ -847,29 +855,22 @@
 
       async function ensureCapturedRequests() {
         if (capturedRequests.length) return true;
-        const pageBtn = findPageActionButton('开始抢购', 'btn-server-start');
+        if (capturePromise) return capturePromise;
+        const pageBtn = findPageActionButton(ACTION_TEXT.START, 'btn-server-start');
         if (!pageBtn) {
           throw new Error('未找到页面抢购按钮，请先进入商品页并点击获取配置');
         }
-        if (captureMode === 'capture-only' && captureResolver) {
-          return new Promise((resolve, reject) => {
-            const prevResolve = captureResolver;
-            const prevReject  = captureRejecter;
-            captureResolver = () => { prevResolve?.(true); resolve(true); };
-            captureRejecter = (error) => { prevReject?.(error); reject(error); };
-          });
-        }
         setTaskMsg('⏳ 正在自动捕获抢购请求...', '');
-        const waitForCapture = new Promise((resolve, reject) => {
+        capturePromise = new Promise((resolve, reject) => {
           captureMode = 'capture-only';
           captureResolver = resolve;
           captureRejecter = reject;
           captureTimer = setTimeout(() => {
             resolveCaptureRequest(false, new Error('自动捕获失败，请重新点击「获取配置」后再试'));
-          }, 8000);
+          }, CAPTURE_REQUEST_TIMEOUT_MS);
         });
         pageBtn.click();
-        await waitForCapture;
+        await capturePromise;
         return capturedRequests.length > 0;
       }
 
@@ -1328,7 +1329,7 @@
             return;
           }
           // 尝试点击原始页面的「获取配置」按钮
-          const pageBtn = findPageActionButton('获取配置', 'btn-get-config');
+          const pageBtn = findPageActionButton(ACTION_TEXT.GET_CONFIG, 'btn-get-config');
           if (pageBtn) {
             pageBtn.click();
             setTaskMsg('⏳ 正在从页面获取配置，请稍候...', '');
