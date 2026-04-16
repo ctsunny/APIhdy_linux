@@ -284,7 +284,7 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:8px;">
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
           </svg>
-          账号 · 通知 · 循环购买
+          账号 · 通知 · 服务器抢购
         </span>
         <span id="v4-indicator" style="font-size:10px; opacity:0.8;">
           <span class="status-dot dot-idle"></span>待机
@@ -311,71 +311,94 @@
         </div>
       </div>
 
-      <!-- 通知 & 循环购买 -->
+      <!-- 通知 & 服务器任务 -->
       <div class="ai-section">
-        <span class="ai-label">通知 & 循环购买 ⚙</span>
+        <span class="ai-label">通知 & 服务器任务 ⚙</span>
         <div class="ai-input-group">
           <input type="text" id="qmsg-token" class="ai-input" placeholder="Qmsg酱 Token (通知)">
         </div>
         <div class="toggle-row">
-          <span style="font-size:12px;color:var(--text-main);">成功后自动循环抢购</span>
+          <span style="font-size:12px;color:var(--text-main);">服务器端持续循环抢购</span>
           <label class="switch">
             <input type="checkbox" id="auto-loop-toggle">
             <span class="slider"></span>
           </label>
         </div>
+        <div class="ai-input-group">
+          <input type="number" id="server-interval" class="ai-input" placeholder="请求间隔秒数（默认 1）" min="0.2" step="0.1">
+          <input type="number" id="server-max-count" class="ai-input" placeholder="成功次数上限（0=不限）" min="0" step="1">
+        </div>
+        <div class="ai-input-group" style="margin-bottom:8px;">
+          <input type="number" id="server-timeout" class="ai-input" placeholder="任务超时秒数（0=不限）" min="0" step="1">
+        </div>
+        <div class="ai-input-group" style="margin-bottom:0;">
+          <button id="btn-start-server" class="ai-btn btn-primary">启动服务器任务</button>
+          <button id="btn-stop-server" class="ai-btn btn-ghost">停止全部</button>
+        </div>
+      </div>
+
+      <div class="ai-section">
+        <span class="ai-label">服务器状态 📡</span>
+        <div id="capture-summary" style="font-size:12px;color:var(--text-main);line-height:1.6;">
+          尚未捕获抢购请求，请先在页面内触发一次抢购请求。
+        </div>
+        <div class="ai-input-group" style="margin-top:10px;margin-bottom:10px;">
+          <button id="btn-refresh-server" class="ai-btn btn-ghost">刷新状态</button>
+          <button id="btn-clear-finished" class="ai-btn btn-ghost">清除已完成</button>
+        </div>
+        <div id="task-list" style="display:flex;flex-direction:column;gap:8px;"></div>
       </div>
 
       <div id="status-bar">系统就绪</div>
 
       <div id="stop-loop-banner">
-        ⏹ 停止循环抢购 (已下单 <span id="loop-count">0</span> 次)
+        ⏹ 停止全部服务器任务 (运行中 <span id="loop-count">0</span> 个)
       </div>
     </div>
 
     <script>
     (function () {
-      // 1. 核心常量与拦截
       const BASE = 'https://www.szhdy.com';
-      let loopCount = 0;
-      let isLooping = false;
-
-      // 兼容旧版 localStorage 键位
       const STORAGE_KEYS = {
         ACCOUNTS: 'ai_accounts',
         QMSG: 'ai_qmsg_token',
-        REPEAT: 'ai_auto_repeat'
+        REPEAT: 'ai_server_loop',
+        INTERVAL: 'ai_server_interval',
+        MAX_COUNT: 'ai_server_max_count',
+        TIMEOUT: 'ai_server_timeout'
+      };
+      const MAX_STORED_CONFIGS = 20;
+      const MIN_INTERVAL_SECONDS = 0.2;
+      const POLL_INTERVAL_MS = 2000;
+      const DEFAULT_CAPTURE_STATE = {
+        configs: [],
+        product: { name: '', price: '', cycle: '', status: 'idle' }
       };
 
-      // 遮罩消除逻辑
+      const originalFetch = window.fetch.bind(window);
+      let captureState = { ...DEFAULT_CAPTURE_STATE };
+      let taskState = [];
+      let isCaptureSaving = false;
+      let captureSavePending = false;
+      let pollTimer = null;
+
       window.onload = () => {
         const loader = document.getElementById('v4-loader');
         loader.style.opacity = '0';
         setTimeout(() => loader.remove(), 600);
       };
 
-      // 屏蔽数据上报后门
-      const originalFetch = window.fetch;
-      window.fetch = function (url, options) {
-        if (typeof url === 'string' && (url.includes('/api_dummy_safe') || url.includes('/order/data.php'))) {
-          return Promise.resolve(new Response(JSON.stringify({ code: 1, status: 200, msg: 'Safe Mode' }), {
-            status: 200, headers: { 'Content-Type': 'application/json' }
-          }));
-        }
-        return originalFetch.apply(this, arguments);
-      };
-
-      // UI 更新函数
       function updateStatus(msg, type = '') {
         const el = document.getElementById('status-bar');
         el.textContent = msg;
         el.className = type ? 'status-' + type : '';
       }
 
-      function setModuleState(state) {
+      function setModuleState(state, runningCount = 0) {
         const ind = document.getElementById('v4-indicator');
+        document.getElementById('loop-count').textContent = String(runningCount);
         if (state === 'running') {
-          ind.innerHTML = '<span class="status-dot dot-running"></span>工作中';
+          ind.innerHTML = '<span class="status-dot dot-running"></span>服务器运行中';
           document.getElementById('stop-loop-banner').style.display = 'block';
         } else {
           ind.innerHTML = '<span class="status-dot dot-idle"></span>待机';
@@ -383,18 +406,366 @@
         }
       }
 
-      // XHR 钩子
+      function escapeHtml(value) {
+        return String(value == null ? '' : value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function normalizeBody(body) {
+        if (body == null) return '';
+        if (typeof body === 'string') return body;
+        if (body instanceof URLSearchParams) return body.toString();
+        if (typeof FormData !== 'undefined' && body instanceof FormData) {
+          return Array.from(body.entries())
+            .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+            .join('&');
+        }
+        if (body instanceof Blob || body instanceof ArrayBuffer) return '';
+        if (ArrayBuffer.isView(body)) return '';
+        try {
+          return JSON.stringify(body);
+        } catch (e) {
+          return '';
+        }
+      }
+
+      function normalizeHeaders(headers) {
+        const out = {};
+        if (!headers) return out;
+        const append = (key, value) => {
+          if (!key) return;
+          const lower = String(key).trim().toLowerCase();
+          if (!lower || ['content-length', 'host', 'origin', 'referer', 'cookie', 'connection'].includes(lower)) return;
+          if (lower.startsWith('sec-')) return;
+          out[String(key)] = String(value == null ? '' : value);
+        };
+        if (typeof Headers !== 'undefined' && headers instanceof Headers) {
+          headers.forEach((value, key) => append(key, value));
+          return out;
+        }
+        if (Array.isArray(headers)) {
+          headers.forEach(([key, value]) => append(key, value));
+          return out;
+        }
+        Object.keys(headers).forEach((key) => append(key, headers[key]));
+        return out;
+      }
+
+      function normalizeTargetUrl(url) {
+        const raw = String(url || '').trim();
+        if (!raw) return '';
+        try {
+          const resolved = new URL(raw, BASE);
+          if (resolved.origin === window.location.origin && resolved.pathname.startsWith('/cart/')) {
+            return new URL(resolved.pathname + resolved.search, BASE).href;
+          }
+          if (!/^https?:\/\//i.test(raw) && raw.startsWith('/')) {
+            return new URL(raw, BASE).href;
+          }
+          return resolved.href;
+        } catch (e) {
+          return raw.startsWith('/') ? (BASE + raw) : raw;
+        }
+      }
+
+      function isPurchaseUrl(url) {
+        const normalized = normalizeTargetUrl(url);
+        return normalized.includes('/cart/settle');
+      }
+
+      function getProductSnapshot() {
+        const title = document.title.replace(/^🦊\s*/, '').trim();
+        const product = captureState.product || DEFAULT_CAPTURE_STATE.product;
+        return {
+          name: title || product.name || '',
+          price: product.price || '',
+          cycle: document.getElementById('auto-loop-toggle')?.checked ? '服务器循环' : '单次/有限次数',
+          status: product.status || 'idle'
+        };
+      }
+
+      function compareTaskStartTime(a, b) {
+        return String(b.start_time || '').localeCompare(String(a.start_time || ''));
+      }
+
+      function getRequestSignature(config) {
+        return `${config.method}|${config.url}|${config.body}`;
+      }
+
+      function getInputNumberValue(elementId, defaultValue) {
+        const raw = document.getElementById(elementId).value || String(defaultValue);
+        const parsed = defaultValue % 1 === 0 ? parseInt(raw, 10) : parseFloat(raw);
+        return Number.isFinite(parsed) ? parsed : defaultValue;
+      }
+
+      async function apiFetch(path, options = {}) {
+        const response = await originalFetch(path, {
+          credentials: 'same-origin',
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+          }
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.code === 0) {
+          throw new Error(data.msg || `HTTP ${response.status}`);
+        }
+        return data;
+      }
+
+      function renderCaptureState() {
+        const configs = Array.isArray(captureState.configs) ? captureState.configs : [];
+        const product = captureState.product || DEFAULT_CAPTURE_STATE.product;
+        const lines = [
+          `已捕获 <b>${configs.length}</b> 个服务器 PID`,
+          product.name ? `商品：${escapeHtml(product.name)}` : '商品：等待页面捕获',
+          captureState.updated_at ? `最近同步：${escapeHtml(captureState.updated_at)}` : '最近同步：暂无'
+        ];
+        if (!configs.length) {
+          lines.push('请在页面中先点击一次原始“开始抢购”，系统会自动抓取请求并保存到服务器。');
+        } else {
+          const previewItems = configs.slice(-3);
+          const previewStart = configs.length - previewItems.length + 1;
+          const preview = previewItems.map((cfg, index) => {
+            const label = `PID ${previewStart + index}`;
+            return `${label}：${escapeHtml(cfg.method || 'POST')} ${escapeHtml((cfg.url || '').replace(BASE, ''))}`;
+          });
+          lines.push(preview.join('<br>'));
+        }
+        document.getElementById('capture-summary').innerHTML = lines.join('<br>');
+        document.getElementById('btn-start-server').disabled = !configs.length;
+      }
+
+      function renderTaskList() {
+        const wrap = document.getElementById('task-list');
+        const tasks = Array.isArray(taskState) ? taskState.slice().sort(compareTaskStartTime) : [];
+        if (!tasks.length) {
+          wrap.innerHTML = '<div style="font-size:12px;color:var(--text-main);padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.04);">暂无服务器任务；抓到一次请求后即可在这里启动后台抢购。</div>';
+          return;
+        }
+        wrap.innerHTML = tasks.map((task) => {
+          const logs = Array.isArray(task.logs) ? task.logs.slice(-3) : [];
+          const statusText = ({
+            running: '运行中',
+            stopped: '已停止',
+            success: '已完成',
+            error: '错误',
+            timeout: '超时'
+          })[task.status] || task.status || '未知';
+          return `
+            <div style="padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.05);font-size:12px;line-height:1.6;">
+              <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                <b>任务 ${escapeHtml(task.id || 'N/A')}</b>
+                <span>${escapeHtml(statusText)}</span>
+              </div>
+              <div>成功次数：${escapeHtml(task.count || 0)} ｜ PID：${escapeHtml(task.current_pid || 1)}/${escapeHtml(task.pid_count || 1)}</div>
+              <div>开始时间：${escapeHtml(task.start_time || '-')}</div>
+              <div>最近单号：${escapeHtml(task.last_order || '-')}</div>
+              ${logs.length ? `<div style="margin-top:6px;color:var(--text-main);">${logs.map(escapeHtml).join('<br>')}</div>` : ''}
+            </div>
+          `;
+        }).join('');
+      }
+
+      function syncModuleStateFromTasks() {
+        const running = Array.isArray(taskState) ? taskState.filter((task) => task.status === 'running') : [];
+        setModuleState(running.length ? 'running' : 'idle', running.length);
+      }
+
+      async function saveCaptureState() {
+        if (isCaptureSaving) {
+          captureSavePending = true;
+          return;
+        }
+        isCaptureSaving = true;
+        try {
+          const payload = {
+            ...captureState,
+            product: {
+              ...getProductSnapshot(),
+              status: (taskState.some((task) => task.status === 'running') ? 'running' : 'idle')
+            }
+          };
+          const result = await apiFetch('/api/capture', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          });
+          captureState = result.data || payload;
+          renderCaptureState();
+        } catch (e) {
+          updateStatus('服务器同步失败: ' + e.message, 'err');
+        } finally {
+          isCaptureSaving = false;
+          if (captureSavePending) {
+            captureSavePending = false;
+            saveCaptureState();
+          }
+        }
+      }
+
+      function capturePurchaseRequest(req) {
+        if (!req || !isPurchaseUrl(req.url)) return;
+        const normalized = {
+          url: normalizeTargetUrl(req.url),
+          method: String(req.method || 'POST').toUpperCase(),
+          headers: normalizeHeaders(req.headers),
+          body: normalizeBody(req.body)
+        };
+        if (!normalized.url) return;
+        const list = Array.isArray(captureState.configs) ? captureState.configs.slice() : [];
+        const signature = getRequestSignature(normalized);
+        if (list.some((item) => getRequestSignature(item) === signature)) return;
+        list.push(normalized);
+        captureState = {
+          ...captureState,
+          configs: list.slice(-MAX_STORED_CONFIGS),
+          product: getProductSnapshot(),
+          updated_at: new Date().toLocaleString()
+        };
+        renderCaptureState();
+        updateStatus(`已捕获服务器请求，当前共 ${captureState.configs.length} 个 PID`, 'ok');
+        saveCaptureState();
+      }
+
+      async function refreshServerState(showMessage = false) {
+        const [captureRes, taskRes] = await Promise.all([
+          apiFetch('/api/capture'),
+          apiFetch('/api/task/status')
+        ]);
+        captureState = captureRes.data || { ...DEFAULT_CAPTURE_STATE };
+        taskState = Array.isArray(taskRes.data) ? taskRes.data : [];
+        renderCaptureState();
+        renderTaskList();
+        syncModuleStateFromTasks();
+        if (showMessage) {
+          updateStatus('服务器状态已刷新', 'ok');
+        }
+      }
+
+      function getServerTaskPayload() {
+        const interval = getInputNumberValue('server-interval', 1);
+        const maxCount = getInputNumberValue('server-max-count', 0);
+        const timeout = getInputNumberValue('server-timeout', 0);
+        return {
+          configs: Array.isArray(captureState.configs) ? captureState.configs : [],
+          interval: Math.max(MIN_INTERVAL_SECONDS, interval),
+          max_count: Math.max(0, maxCount),
+          timeout: Math.max(0, timeout),
+          loop: document.getElementById('auto-loop-toggle').checked
+        };
+      }
+
+      async function startServerTask() {
+        const running = taskState.filter((task) => task.status === 'running');
+        if (running.length) {
+          updateStatus('已有服务器任务在运行，请先停止后再启动', 'err');
+          return;
+        }
+        const payload = getServerTaskPayload();
+        if (!payload.configs.length) {
+          updateStatus('请先在页面内触发一次抢购请求，捕获 PID 后再启动', 'err');
+          return;
+        }
+        const result = await apiFetch('/api/task/start', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        updateStatus(`服务器任务已启动：${result.task_id}`, 'ok');
+        await refreshServerState();
+      }
+
+      async function stopAllServerTasks(showMessage = true) {
+        await apiFetch('/api/task/stop', {
+          method: 'POST',
+          body: JSON.stringify({ task_id: '' })
+        });
+        if (showMessage) {
+          updateStatus('已发送停止全部服务器任务指令', 'ok');
+        }
+        await refreshServerState();
+      }
+
+      async function clearFinishedTasks() {
+        const result = await apiFetch('/api/task/clear', {
+          method: 'POST',
+          body: JSON.stringify({})
+        });
+        updateStatus(result.msg || '已清理完成任务', 'ok');
+        await refreshServerState();
+      }
+
+      function onOrderSuccess(invId) {
+        updateStatus(`浏览器请求成功，单号：${invId || 'OK'}；后台任务可继续独立运行`, 'ok');
+        const token = localStorage.getItem(STORAGE_KEYS.QMSG);
+        if (token) {
+          const msg = `✅ 秒杀成功！\n⏰ ${new Date().toLocaleTimeString()}\n🔖 单号：${invId || 'N/A'}`;
+          originalFetch(`https://qmsg.zendee.cn/send/${token}`, {
+            method: 'POST',
+            body: 'msg=' + encodeURIComponent(msg),
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+          }).catch(() => {});
+        }
+      }
+
+      window.fetch = function (url, options) {
+        const reqUrl = typeof url === 'string' ? url : (url && url.url) || '';
+        if (typeof reqUrl === 'string' && (reqUrl.includes('/api_dummy_safe') || reqUrl.includes('/order/data.php'))) {
+          return Promise.resolve(new Response(JSON.stringify({ code: 1, status: 200, msg: 'Safe Mode' }), {
+            status: 200, headers: { 'Content-Type': 'application/json' }
+          }));
+        }
+        const reqInfo = {
+          url: reqUrl,
+          method: (options && options.method) || 'GET',
+          headers: normalizeHeaders(options && options.headers),
+          body: options && options.body
+        };
+        const shouldWatch = isPurchaseUrl(reqInfo.url);
+        if (shouldWatch) capturePurchaseRequest(reqInfo);
+        return originalFetch.apply(this, arguments).then((response) => {
+          if (shouldWatch) {
+            response.clone().json().then((data) => {
+              if (data && (data.status === 200 || data.status === '200')) {
+                onOrderSuccess(data.data && data.data.invoiceid);
+              }
+            }).catch((error) => console.debug('capture fetch parse failed', error));
+          }
+          return response;
+        });
+      };
+
       const XHR = XMLHttpRequest.prototype;
       const oOpen = XHR.open;
       const oSend = XHR.send;
+      const oSetHeader = XHR.setRequestHeader;
 
       XHR.open = function(method, url) {
-        this._url = url;
+        this._apihdyReq = {
+          method: String(method || 'GET').toUpperCase(),
+          url,
+          headers: {}
+        };
         return oOpen.apply(this, arguments);
       };
 
+      XHR.setRequestHeader = function(name, value) {
+        if (this._apihdyReq) {
+          this._apihdyReq.headers[name] = value;
+        }
+        return oSetHeader.apply(this, arguments);
+      };
+
       XHR.send = function(body) {
-        if (this._url.includes('/cart/settle')) {
+        if (this._apihdyReq) {
+          this._apihdyReq.body = body;
+          capturePurchaseRequest(this._apihdyReq);
+        }
+        if (this._apihdyReq && isPurchaseUrl(this._apihdyReq.url)) {
           this.addEventListener('load', () => {
             try {
               const res = JSON.parse(this.responseText);
@@ -407,46 +778,9 @@
         return oSend.apply(this, arguments);
       };
 
-      function onOrderSuccess(invId) {
-        loopCount++;
-        document.getElementById('loop-count').textContent = loopCount;
-        updateStatus(`✔ 第 ${loopCount} 单成功: ${invId || 'OK'}`, 'ok');
-        
-        // 发送通知
-        const token = localStorage.getItem(STORAGE_KEYS.QMSG);
-        if (token) {
-          const msg = `✅ 秒杀成功！\n⏰ ${new Date().toLocaleTimeString()}\n🔖 单号：${invId || 'N/A'}\n🔄 累计下单：${loopCount}`;
-          originalFetch(`https://qmsg.zendee.cn/send/${token}`, {
-            method: 'POST', body: 'msg=' + encodeURIComponent(msg),
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'}
-          });
-        }
-
-        if (document.getElementById('auto-loop-toggle').checked) {
-          isLooping = true;
-          setModuleState('running');
-          setTimeout(() => {
-            if (!isLooping) return;
-            const btn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('开始抢购'));
-            if (btn) btn.click();
-            else stopWorkflow('未发现抢购按钮');
-          }, 600);
-        }
-      }
-
-      function stopWorkflow(reason) {
-        isLooping = false;
-        setModuleState('idle');
-        updateStatus('⏹ 已停止: ' + (reason || '手动'), '');
-        const stopBtn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('停止') && !b.innerText.includes('循环'));
-        if (stopBtn) stopBtn.click();
-      }
-
-      // 将面板注入 Vue 主内容区（等待 Vue 渲染完成）
       function injectPanelIntoMain() {
         const panel = document.getElementById('ai-v4-panel');
         if (!panel) return;
-        // 找到 Vue 渲染的主内容容器 (max-w-[800px] 或 space-y-4)
         const container =
           document.querySelector('[class*="max-w-\\[800px\\]"]') ||
           document.querySelector('[class*="space-y-4"]') ||
@@ -459,13 +793,11 @@
         return false;
       }
 
-      // 用 MutationObserver 等待 Vue 渲染
       const _mo = new MutationObserver(() => {
         if (injectPanelIntoMain()) _mo.disconnect();
       });
       _mo.observe(document.getElementById('app'), { childList: true, subtree: true });
 
-      // 交互逻辑
       window.addEventListener('DOMContentLoaded', () => {
         const accounts = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACCOUNTS) || '{}');
         const sel = document.getElementById('acc-list');
@@ -534,14 +866,57 @@
         repeatToggle.checked = localStorage.getItem(STORAGE_KEYS.REPEAT) === 'true';
         repeatToggle.onchange = (e) => localStorage.setItem(STORAGE_KEYS.REPEAT, e.target.checked);
 
-        document.getElementById('stop-loop-banner').onclick = () => stopWorkflow('用户手动拦截');
+        const intervalInput = document.getElementById('server-interval');
+        const maxCountInput = document.getElementById('server-max-count');
+        const timeoutInput = document.getElementById('server-timeout');
+        intervalInput.min = String(MIN_INTERVAL_SECONDS);
+        intervalInput.value = localStorage.getItem(STORAGE_KEYS.INTERVAL) || '1';
+        maxCountInput.value = localStorage.getItem(STORAGE_KEYS.MAX_COUNT) || '0';
+        timeoutInput.value = localStorage.getItem(STORAGE_KEYS.TIMEOUT) || '0';
+        intervalInput.oninput = (e) => localStorage.setItem(STORAGE_KEYS.INTERVAL, e.target.value || '1');
+        maxCountInput.oninput = (e) => localStorage.setItem(STORAGE_KEYS.MAX_COUNT, e.target.value || '0');
+        timeoutInput.oninput = (e) => localStorage.setItem(STORAGE_KEYS.TIMEOUT, e.target.value || '0');
 
-        // 检测原始停止按钮
-        document.addEventListener('click', (e) => {
-          if (e.target.innerText?.includes('停止') && !e.target.id?.includes('stop-loop')) {
-            if (isLooping) stopWorkflow('外部系统干预');
+        document.getElementById('btn-start-server').onclick = async () => {
+          try {
+            await startServerTask();
+          } catch (e) {
+            updateStatus('启动失败: ' + e.message, 'err');
           }
-        });
+        };
+        document.getElementById('btn-stop-server').onclick = async () => {
+          try {
+            await stopAllServerTasks();
+          } catch (e) {
+            updateStatus('停止失败: ' + e.message, 'err');
+          }
+        };
+        document.getElementById('btn-refresh-server').onclick = async () => {
+          try {
+            await refreshServerState(true);
+          } catch (e) {
+            updateStatus('刷新失败: ' + e.message, 'err');
+          }
+        };
+        document.getElementById('btn-clear-finished').onclick = async () => {
+          try {
+            await clearFinishedTasks();
+          } catch (e) {
+            updateStatus('清理失败: ' + e.message, 'err');
+          }
+        };
+        document.getElementById('stop-loop-banner').onclick = async () => {
+          try {
+            await stopAllServerTasks();
+          } catch (e) {
+            updateStatus('停止失败: ' + e.message, 'err');
+          }
+        };
+
+        refreshServerState(true).catch((e) => updateStatus('读取服务器状态失败: ' + e.message, 'err'));
+        pollTimer = setInterval(() => {
+          refreshServerState(false).catch(() => {});
+        }, POLL_INTERVAL_MS);
 
         console.log('%c APIhdy V5 Supreme Loaded ', 'background: #06b6d4; color: #000; font-weight: bold;');
       });
