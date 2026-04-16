@@ -253,94 +253,6 @@
       }
       @keyframes spin { to { transform: rotate(360deg); } }
 
-      /* ── 标签导航 ──────────────────────────────────────── */
-      .v5-tabs {
-        display: flex;
-        gap: 4px;
-        margin-bottom: 14px;
-        background: rgba(0,0,0,0.04);
-        border-radius: 14px;
-        padding: 4px;
-      }
-      .v5-tab {
-        flex: 1;
-        text-align: center;
-        padding: 6px 4px;
-        font-size: 11px;
-        font-weight: 700;
-        border-radius: 10px;
-        cursor: pointer;
-        transition: all 0.2s;
-        color: var(--text-muted);
-        user-select: none;
-      }
-      .v5-tab.active {
-        background: #fff;
-        color: var(--primary);
-        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-      }
-      .v5-pane { display: none; }
-      .v5-pane.active { display: block; }
-
-      /* ── 任务日志 ──────────────────────────────────────── */
-      #task-log-box {
-        background: #0f172a;
-        color: #94a3b8;
-        border-radius: 10px;
-        padding: 8px 10px;
-        font-size: 10px;
-        font-family: 'Courier New', monospace;
-        max-height: 120px;
-        overflow-y: auto;
-        margin-top: 8px;
-        line-height: 1.6;
-      }
-      #task-log-box:empty::before { content: '暂无日志...'; opacity: 0.4; }
-
-      /* ── 任务状态徽章 ──────────────────────────────────── */
-      .task-badge {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 8px;
-        font-size: 10px;
-        font-weight: 700;
-      }
-      .badge-running  { background: rgba(16,185,129,.15); color: #10b981; }
-      .badge-stopped  { background: rgba(100,116,139,.12); color: #64748b; }
-      .badge-success  { background: rgba(16,185,129,.15); color: #10b981; }
-      .badge-error    { background: rgba(239,68,68,.15);  color: #ef4444; }
-      .badge-timeout  { background: rgba(245,158,11,.15); color: #f59e0b; }
-      .badge-pending  { background: rgba(59,130,246,.12); color: #3b82f6; }
-
-      /* ── 设置 textarea / 小输入 ─────────────────────────── */
-      .ai-input-sm {
-        flex: 1;
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        color: #0f172a;
-        padding: 6px 10px;
-        border-radius: 10px;
-        font-size: 12px;
-        outline: none;
-        transition: all 0.2s;
-        min-width: 0;
-      }
-      .ai-input-sm:focus { border-color: var(--primary); }
-
-      .settings-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 8px;
-        flex-wrap: wrap;
-      }
-      .settings-label {
-        font-size: 11px;
-        font-weight: 700;
-        color: var(--text-muted);
-        min-width: 52px;
-      }
-
       #stop-loop-banner {
         display: none;
         background: linear-gradient(90deg, #991b1b, #ef4444);
@@ -365,331 +277,53 @@
 
     <div id="app"></div>
 
-    <!-- ── 额外样式：任务卡片 ───────────────────────────────────────────────── -->
-    <style>
-      .task-card {
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 10px 12px;
-        margin-bottom: 8px;
-        transition: border-color 0.2s;
-      }
-      .task-card:hover { border-color: rgba(2,132,199,0.3); }
-      .task-card-header {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 5px;
-        flex-wrap: wrap;
-      }
-      .task-card-id {
-        font-size: 10px;
-        color: var(--text-muted);
-        font-family: 'Courier New', monospace;
-        flex: 1;
-      }
-      .task-card-stats {
-        font-size: 11px;
-        color: var(--text-main);
-        margin-bottom: 4px;
-      }
-      .task-card-log {
-        background: #0f172a;
-        color: #94a3b8;
-        border-radius: 8px;
-        padding: 5px 8px;
-        font-size: 10px;
-        font-family: 'Courier New', monospace;
-        max-height: 80px;
-        overflow-y: auto;
-        line-height: 1.5;
-        margin-top: 6px;
-      }
-      .task-card-log:empty::before { content: '暂无日志...'; opacity: 0.4; }
-      .task-card-footer {
-        display: flex;
-        justify-content: flex-end;
-        margin-top: 6px;
-        gap: 6px;
-      }
-      .btn-stop-task {
-        padding: 3px 10px;
-        border-radius: 8px;
-        font-size: 11px;
-        font-weight: 700;
-        cursor: pointer;
-        border: 1px solid rgba(239,68,68,0.3);
-        background: rgba(239,68,68,0.1);
-        color: #ef4444;
-        transition: all 0.2s;
-      }
-      .btn-stop-task:hover { background: rgba(239,68,68,0.2); }
-      .task-resumed-badge {
-        font-size: 9px;
-        background: rgba(2,132,199,0.15);
-        color: var(--primary);
-        border-radius: 6px;
-        padding: 1px 6px;
-        font-weight: 700;
-        white-space: nowrap;
-      }
-      #task-list-empty {
-        text-align: center;
-        font-size: 11px;
-        color: var(--text-muted);
-        padding: 12px 0;
-      }
-
-      /* ── 商品信息卡片 ── */
-      .product-info-card {
-        background: rgba(241,245,249,0.8);
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        padding: 10px 12px;
-        margin-bottom: 8px;
-      }
-      .product-status-badge {
-        display: inline-block;
-        font-size: 10px;
-        font-weight: 700;
-        padding: 2px 10px;
-        border-radius: 12px;
-        margin-bottom: 7px;
-      }
-      .product-status-running {
-        background: rgba(16,185,129,0.15);
-        color: #10b981;
-      }
-      .product-status-stopped {
-        background: rgba(239,68,68,0.12);
-        color: #ef4444;
-      }
-      .product-status-idle {
-        background: rgba(100,116,139,0.12);
-        color: #64748b;
-      }
-      .product-info-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 4px 0;
-        font-size: 12px;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-      }
-      .product-info-row:last-child { border-bottom: none; }
-      .product-info-label {
-        color: var(--text-muted);
-        font-size: 11px;
-        min-width: 56px;
-      }
-      .product-info-value {
-        color: var(--text-main);
-        font-weight: 600;
-        font-size: 12px;
-        text-align: right;
-      }
-    </style>
-
-    <!-- ── 极速秒杀控制面板（由 JS 注入主内容区） ──────────────────────────── -->
+    <!-- 账号·通知·循环购买 (由 JS 注入主内容区) -->
     <div id="ai-v4-panel" style="display:none;">
       <h3>
         <span style="display:flex;align-items:center;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:8px;">
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
           </svg>
-          极速秒杀 V5 Supreme
+          账号 · 通知 · 循环购买
         </span>
         <span id="v4-indicator" style="font-size:10px; opacity:0.8;">
           <span class="status-dot dot-idle"></span>待机
         </span>
       </h3>
 
-      <!-- 标签导航 -->
-      <div class="v5-tabs">
-        <div class="v5-tab" data-tab="account">🔐 账号</div>
-        <div class="v5-tab active" data-tab="task">⚡ 任务</div>
-        <div class="v5-tab" data-tab="settings">⚙️ 设置</div>
-      </div>
-
-      <!-- ── 账号面板 ── -->
-      <div class="v5-pane" id="pane-account">
-        <div class="ai-section">
-          <span class="ai-label">账号管理 🔐</span>
-          <div class="ai-input-group">
-            <select id="acc-list" class="ai-select">
-              <option value="">快速切换账号</option>
-            </select>
-          </div>
-          <div class="ai-input-group">
-            <input type="text" id="user" class="ai-input" placeholder="手机号 / 邮箱">
-          </div>
-          <div class="ai-input-group">
-            <input type="text" id="pass" class="ai-input" placeholder="API 密钥">
-          </div>
-          <div class="ai-input-group" style="margin-bottom:0;">
-            <button id="btn-login" class="ai-btn btn-primary">快速登录</button>
-            <button id="btn-save" class="ai-btn btn-ghost">保存账号</button>
-          </div>
-        </div>
-
-        <!-- 客户端辅助功能（旧版兼容） -->
-        <div class="ai-section">
-          <span class="ai-label">客户端辅助 ⚙</span>
-          <div class="ai-input-group">
-            <input type="text" id="qmsg-token" class="ai-input" placeholder="Qmsg酱 Token（客户端即时通知）">
-          </div>
-          <div class="toggle-row" style="margin-bottom:0;">
-            <span style="font-size:12px;color:var(--text-main);">成功后自动循环抢购（客户端模式）</span>
-            <label class="switch">
-              <input type="checkbox" id="auto-loop-toggle">
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── 任务面板 ── -->
-      <div class="v5-pane active" id="pane-task">
-        <!-- 说明栏 -->
-        <div style="background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:7px 12px;margin-bottom:10px;font-size:11px;color:#10b981;font-weight:600;">
-          🟢 任务运行于服务器端 · 刷新页面 / 关闭浏览器都不会停止
-        </div>
-
-        <!-- 商品信息 -->
-        <div class="ai-section">
-          <span class="ai-label">商品信息 🛒</span>
-          <div id="product-info-card" class="product-info-card">
-            <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:4px 0;">
-              请先点击「获取配置」，再点击「开始抢购」
-            </div>
-          </div>
-          <div class="ai-input-group">
-            <button id="btn-get-config" class="ai-btn btn-ghost" style="font-size:11px;">📋 获取配置</button>
-            <button id="btn-server-start" class="ai-btn btn-primary">🚀 开始抢购</button>
-          </div>
-          <div class="ai-input-group" style="margin-bottom:0;">
-            <button id="btn-scheduled-start" class="ai-btn btn-ghost" style="font-size:11px;">⏰ 定时开始</button>
-            <button id="btn-stop-all" class="ai-btn btn-danger">⏹ 停止全部</button>
-          </div>
-          <div id="scheduled-time-row" style="display:none;margin-top:8px;">
-            <div class="settings-row">
-              <span class="settings-label" style="white-space:nowrap;">开始时间</span>
-              <input type="datetime-local" id="scheduled-time" class="ai-input-sm" style="flex:1;">
-            </div>
-            <div class="ai-input-group" style="margin-bottom:0;">
-              <button id="btn-confirm-schedule" class="ai-btn btn-primary" style="font-size:11px;">✅ 确认定时</button>
-              <button id="btn-cancel-schedule" class="ai-btn btn-ghost" style="font-size:11px;">取消</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 任务参数 -->
-        <div class="ai-section">
-          <span class="ai-label">任务参数 ⚙</span>
-          <div class="settings-row">
-            <span class="settings-label">间隔(秒)</span>
-            <input type="number" id="task-interval" class="ai-input-sm" value="1" min="0.2" step="0.1" style="max-width:80px;">
-            <span class="settings-label" style="margin-left:8px;">最大次数</span>
-            <input type="number" id="task-max-count" class="ai-input-sm" value="0" min="0" style="max-width:80px;">
-            <span style="font-size:10px;color:var(--text-muted);">(0=不限)</span>
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">超时(秒)</span>
-            <input type="number" id="task-timeout" class="ai-input-sm" value="0" min="0" style="max-width:80px;">
-            <span style="font-size:10px;color:var(--text-muted);">(0=不限)</span>
-            <div class="toggle-row" style="margin-left:auto;gap:6px;">
-              <span style="font-size:11px;color:var(--text-main);">成功后循环</span>
-              <label class="switch"><input type="checkbox" id="task-loop" checked><span class="slider"></span></label>
-            </div>
-          </div>
-        </div>
-
-        <div id="task-msg" style="font-size:11px;text-align:center;margin-top:6px;margin-bottom:8px;color:var(--text-muted);min-height:16px;"></div>
-
-        <!-- 任务列表 -->
-        <div class="ai-section" style="padding-bottom:8px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-            <span class="ai-label" style="margin-bottom:0;">任务列表 📋</span>
-            <button id="btn-clear-finished" class="ai-btn btn-ghost" style="font-size:10px;padding:4px 10px;flex:none;">清除已完成</button>
-          </div>
-          <div id="task-list-container"><div id="task-list-empty">暂无任务 · 请获取配置后点击启动</div></div>
-        </div>
-      </div>
-
-      <!-- ── 设置面板（通知 + 站点配置） ── -->
-      <div class="v5-pane" id="pane-settings">
-        <!-- 站点备注 -->
-        <div class="ai-section">
-          <span class="ai-label">站点备注 🏷</span>
-          <div class="settings-row">
-            <input type="text" id="cfg-site-remark" class="ai-input" placeholder="如：我的香港VPS-1（通知消息中显示）">
-          </div>
-        </div>
-
-        <!-- Telegram -->
-        <div class="ai-section">
-          <div class="toggle-row" style="margin-bottom:8px;">
-            <span class="ai-label" style="margin-bottom:0;">Telegram 通知 ✈️</span>
-            <label class="switch"><input type="checkbox" id="cfg-tg-enabled"><span class="slider"></span></label>
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Bot Token</span>
-            <input type="text" id="cfg-tg-token" class="ai-input-sm" placeholder="123456:ABC...">
-          </div>
-          <div class="settings-row" style="margin-bottom:0;">
-            <span class="settings-label">Chat ID</span>
-            <input type="text" id="cfg-tg-chatid" class="ai-input-sm" placeholder="-100123456789">
-          </div>
-        </div>
-
-        <!-- Qmsg / QQ -->
-        <div class="ai-section">
-          <div class="toggle-row" style="margin-bottom:8px;">
-            <span class="ai-label" style="margin-bottom:0;">QQ 通知 (Qmsg酱) 💬</span>
-            <label class="switch"><input type="checkbox" id="cfg-qq-enabled"><span class="slider"></span></label>
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Token</span>
-            <input type="text" id="cfg-qq-token" class="ai-input-sm" placeholder="Qmsg酱 Token">
-          </div>
-          <div class="settings-row" style="margin-bottom:0;">
-            <span class="settings-label">QQ 号</span>
-            <input type="text" id="cfg-qq-qq" class="ai-input-sm" placeholder="可选，指定接收QQ">
-          </div>
-        </div>
-
-        <!-- Bark -->
-        <div class="ai-section">
-          <div class="toggle-row" style="margin-bottom:8px;">
-            <span class="ai-label" style="margin-bottom:0;">Bark 通知 (iOS) 🍎</span>
-            <label class="switch"><input type="checkbox" id="cfg-bark-enabled"><span class="slider"></span></label>
-          </div>
-          <div class="settings-row">
-            <span class="settings-label">Key</span>
-            <input type="text" id="cfg-bark-key" class="ai-input-sm" placeholder="Bark 设备 Key">
-          </div>
-          <div class="settings-row" style="margin-bottom:0;">
-            <span class="settings-label">服务器</span>
-            <input type="text" id="cfg-bark-server" class="ai-input-sm" placeholder="https://api.day.app">
-          </div>
-        </div>
-
-        <!-- 通知事件 -->
-        <div class="ai-section">
-          <span class="ai-label">通知事件 🔔</span>
-          <div class="toggle-row"><span style="font-size:12px;">🚀 任务启动</span><label class="switch"><input type="checkbox" id="ev-start" checked><span class="slider"></span></label></div>
-          <div class="toggle-row"><span style="font-size:12px;">✅ 购买成功</span><label class="switch"><input type="checkbox" id="ev-success" checked><span class="slider"></span></label></div>
-          <div class="toggle-row"><span style="font-size:12px;">❌ 任务出错</span><label class="switch"><input type="checkbox" id="ev-error" checked><span class="slider"></span></label></div>
-          <div class="toggle-row"><span style="font-size:12px;">⏹ 任务停止</span><label class="switch"><input type="checkbox" id="ev-stop" checked><span class="slider"></span></label></div>
-          <div class="toggle-row" style="margin-bottom:0;"><span style="font-size:12px;">⏰ 任务超时</span><label class="switch"><input type="checkbox" id="ev-timeout" checked><span class="slider"></span></label></div>
-        </div>
-
+      <!-- 账号体系 -->
+      <div class="ai-section">
+        <span class="ai-label">Account 🔐</span>
         <div class="ai-input-group">
-          <button id="btn-save-settings" class="ai-btn btn-primary">💾 保存设置</button>
-          <button id="btn-test-notify" class="ai-btn btn-ghost">📢 测试通知</button>
+          <select id="acc-list" class="ai-select">
+            <option value="">快速切换账号</option>
+          </select>
         </div>
-        <div id="settings-msg" style="font-size:11px;text-align:center;margin-top:6px;color:var(--text-muted);"></div>
+        <div class="ai-input-group">
+          <input type="text" id="user" class="ai-input" placeholder="手机号/邮箱">
+        </div>
+        <div class="ai-input-group">
+          <input type="text" id="pass" class="ai-input" placeholder="API 密钥">
+        </div>
+        <div class="ai-input-group" style="margin-bottom:0;">
+          <button id="btn-login" class="ai-btn btn-primary">快速登录</button>
+          <button id="btn-save" class="ai-btn btn-ghost">保存</button>
+        </div>
+      </div>
+
+      <!-- 通知 & 循环购买 -->
+      <div class="ai-section">
+        <span class="ai-label">通知 & 循环购买 ⚙</span>
+        <div class="ai-input-group">
+          <input type="text" id="qmsg-token" class="ai-input" placeholder="Qmsg酱 Token (通知)">
+        </div>
+        <div class="toggle-row">
+          <span style="font-size:12px;color:var(--text-main);">成功后自动循环抢购</span>
+          <label class="switch">
+            <input type="checkbox" id="auto-loop-toggle">
+            <span class="slider"></span>
+          </label>
+        </div>
       </div>
 
       <div id="status-bar">系统就绪</div>
@@ -701,40 +335,26 @@
 
     <script>
     (function () {
-      // ── 核心常量 ────────────────────────────────────────────────────────────
+      // 1. 核心常量与拦截
       const BASE = 'https://www.szhdy.com';
-      let loopCount        = 0;
-      let isLooping        = false;
-      let pollTimer        = null;
-      let capturedRequests = [];   // 多PID列表，每项为一个捕获的请求
-      let currentProduct   = { name: '', price: '', cycle: '', status: 'idle' };
-      let scheduledTimer   = null;
-      let captureMode      = null;
-      let capturePromise   = null;
-      let captureResolver  = null;
-      let captureRejector  = null;
-      let captureTimer     = null;
+      let loopCount = 0;
+      let isLooping = false;
 
-      const AUTO_CAPTURE_TIMEOUT_MS = 8000;
-      const ACTION_TEXT = {
-        GET_CONFIG: '获取配置',
-        START: '开始抢购',
-      };
-
+      // 兼容旧版 localStorage 键位
       const STORAGE_KEYS = {
         ACCOUNTS: 'ai_accounts',
-        QMSG:     'ai_qmsg_token',
-        REPEAT:   'ai_auto_repeat',
+        QMSG: 'ai_qmsg_token',
+        REPEAT: 'ai_auto_repeat'
       };
 
-      // ── 加载遮罩 ─────────────────────────────────────────────────────────────
+      // 遮罩消除逻辑
       window.onload = () => {
         const loader = document.getElementById('v4-loader');
         loader.style.opacity = '0';
         setTimeout(() => loader.remove(), 600);
       };
 
-      // ── 屏蔽数据上报后门 ──────────────────────────────────────────────────────
+      // 屏蔽数据上报后门
       const originalFetch = window.fetch;
       window.fetch = function (url, options) {
         if (typeof url === 'string' && (url.includes('/api_dummy_safe') || url.includes('/order/data.php'))) {
@@ -745,11 +365,11 @@
         return originalFetch.apply(this, arguments);
       };
 
-      // ── UI 辅助 ──────────────────────────────────────────────────────────────
+      // UI 更新函数
       function updateStatus(msg, type = '') {
         const el = document.getElementById('status-bar');
         el.textContent = msg;
-        el.className   = type ? 'status-' + type : '';
+        el.className = type ? 'status-' + type : '';
       }
 
       function setModuleState(state) {
@@ -763,281 +383,45 @@
         }
       }
 
-      function setTaskMsg(msg, color) {
-        const el = document.getElementById('task-msg');
-        el.textContent = msg;
-        el.style.color = color || 'var(--text-muted)';
-      }
+      // XHR 钩子
+      const XHR = XMLHttpRequest.prototype;
+      const oOpen = XHR.open;
+      const oSend = XHR.send;
 
-      function _escHtml(s) {
-        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-      }
-
-      function sanitizeCapturedRequest(req) {
-        return {
-          url: String(req?.url || '').trim(),
-          method: String(req?.method || 'POST').toUpperCase(),
-          headers: Object.fromEntries(
-            Object.entries(req?.headers || {}).map(([k, v]) => [String(k), v === null || v === undefined ? '' : String(v)])
-          ),
-          body: req?.body == null ? '' : String(req.body),
-          _key: String(req?._key || ''),
-        };
-      }
-
-      function buildCapturePayload() {
-        return {
-          product: {
-            name: String(currentProduct?.name || ''),
-            price: String(currentProduct?.price || ''),
-            cycle: String(currentProduct?.cycle || ''),
-            status: String(currentProduct?.status || 'idle'),
-          },
-          configs: capturedRequests.map(sanitizeCapturedRequest).map(({ url, method, headers, body }) => ({
-            url, method, headers, body,
-          })),
-        };
-      }
-
-      function applyCaptureState(data) {
-        capturedRequests = Array.isArray(data?.configs)
-          ? data.configs.map(sanitizeCapturedRequest).filter(item => item.url)
-          : [];
-        const product = data?.product || {};
-        currentProduct = {
-          name: String(product.name || ''),
-          price: String(product.price || ''),
-          cycle: String(product.cycle || ''),
-          status: String(product.status || 'idle'),
-        };
-        updateProductInfoUI();
-      }
-
-      async function saveCaptureState(quiet = true) {
-        try {
-          await apiPost('/api/capture', buildCapturePayload());
-        } catch (e) {
-          if (!quiet) setTaskMsg('❌ 保存配置失败: ' + e.message, 'var(--danger)');
-        }
-      }
-
-      async function loadCaptureState() {
-        try {
-          const res = await apiGet('/api/capture');
-          if (res.code === 1) applyCaptureState(res.data);
-        } catch (e) {
-          console.warn('[APIhdy] 加载配置失败:', e.message);
-        }
-      }
-
-      function resolveCaptureRequest(ok, err) {
-        if (captureTimer) {
-          clearTimeout(captureTimer);
-          captureTimer = null;
-        }
-        const resolve = captureResolver;
-        const reject  = captureRejector;
-        captureMode = null;
-        capturePromise = null;
-        captureResolver = null;
-        captureRejector = null;
-        if (ok && resolve) resolve(true);
-        if (!ok && reject) reject(err || new Error('未捕获到抢购请求'));
-      }
-
-      function findPageActionButton(keyword, selfId) {
-        return Array.from(document.querySelectorAll('button')).find(btn =>
-          btn.id !== selfId &&
-          !btn.disabled &&
-          (btn.innerText?.includes(keyword) || btn.textContent?.includes(keyword))
-        );
-      }
-
-      async function ensureCapturedRequests() {
-        if (capturedRequests.length) return true;
-        if (capturePromise) return capturePromise;
-        const pageBtn = findPageActionButton(ACTION_TEXT.START, 'btn-server-start');
-        if (!pageBtn) {
-          throw new Error(`未找到页面抢购按钮，请先进入商品页并点击${ACTION_TEXT.GET_CONFIG}`);
-        }
-        setTaskMsg('⏳ 正在自动捕获抢购请求...', '');
-        capturePromise = new Promise((resolve, reject) => {
-          captureMode = 'capture-only';
-          captureResolver = resolve;
-          captureRejector = reject;
-          captureTimer = setTimeout(() => {
-            resolveCaptureRequest(false, new Error(`自动捕获失败，请重新点击「${ACTION_TEXT.GET_CONFIG}」后再试`));
-          }, AUTO_CAPTURE_TIMEOUT_MS);
-        });
-        try {
-          pageBtn.click();
-          await capturePromise;
-          return capturedRequests.length > 0;
-        } catch (e) {
-          if (captureMode === 'capture-only') resolveCaptureRequest(false, e);
-          throw e;
-        }
-      }
-
-      // ── XHR 钩子（捕获请求 + 检测成功） ─────────────────────────────────────
-      const XHR        = XMLHttpRequest.prototype;
-      const oOpen      = XHR.open;
-      const oSend      = XHR.send;
-      const oSetHeader = XHR.setRequestHeader;
-
-      XHR.open = function (method, url) {
-        this._url    = url;
-        this._method = method;
-        this._hdrs   = {};
+      XHR.open = function(method, url) {
+        this._url = url;
         return oOpen.apply(this, arguments);
       };
 
-      XHR.setRequestHeader = function (header, value) {
-        if (this._hdrs) this._hdrs[header] = value;
-        return oSetHeader.apply(this, arguments);
-      };
-
-      XHR.send = function (body) {
-        if (this._url && this._url.includes('/cart/settle')) {
-          const _body = (typeof body === 'string') ? body
-                        : (body instanceof URLSearchParams) ? body.toString() : '';
-          const _key  = JSON.stringify({ u: this._url, b: _body });
-          if (!capturedRequests.some(r => r._key === _key)) {
-            capturedRequests.push(sanitizeCapturedRequest({
-              url:     this._url,
-              method:  (this._method || 'POST').toUpperCase(),
-              headers: Object.assign({}, this._hdrs || {}),
-              body:    _body,
-              _key:    _key,
-            }));
-            updateProductInfoUI();
-            saveCaptureState(true);
-          }
-          if (captureMode === 'capture-only') {
-            resolveCaptureRequest(true);
-            setTaskMsg('✅ 已捕获抢购请求，正在转交服务器...', 'var(--success)');
-            try { this.abort(); } catch (e) {}
-            return;
-          }
+      XHR.send = function(body) {
+        if (this._url.includes('/cart/settle')) {
           this.addEventListener('load', () => {
             try {
               const res = JSON.parse(this.responseText);
               if (res.status == 200 || res.status === '200') {
                 onOrderSuccess(res.data?.invoiceid);
               }
-            } catch (e) {}
-          });
-        }
-        // 拦截所有 JSON 响应，尝试提取商品信息（配置类接口）
-        if (this._url && !this._url.includes('/cart/settle')) {
-          this.addEventListener('load', () => {
-            if (!currentProduct.name) {
-              try {
-                const res = JSON.parse(this.responseText);
-                tryExtractProductFromJson(res);
-              } catch (e) {}
-            }
+            } catch(e){}
           });
         }
         return oSend.apply(this, arguments);
       };
 
-      function updateProductInfoUI() {
-        const card = document.getElementById('product-info-card');
-        if (!card) return;
-        if (!currentProduct.name && !capturedRequests.length) {
-          card.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:4px 0;">请先点击「获取配置」，再点击「开始抢购」</div>';
-          return;
-        }
-        const st = currentProduct.status;
-        const [stLabel, stCls] = st === 'running'
-          ? ['运行中', 'product-status-running']
-          : st === 'idle' && capturedRequests.length
-            ? ['已捕获', 'product-status-idle']
-            : ['已停止', 'product-status-stopped'];
-        const pidLine = capturedRequests.length > 1
-          ? `<div class="product-info-row"><span class="product-info-label">已捕获</span><span class="product-info-value" style="color:var(--primary);">${capturedRequests.length} 个配置</span></div>`
-          : capturedRequests.length === 1
-            ? `<div class="product-info-row"><span class="product-info-label">已捕获</span><span class="product-info-value" style="color:var(--success);">✔ 1 个配置</span></div>`
-            : '';
-        card.innerHTML = `
-          <span class="product-status-badge ${stCls}">● ${stLabel}</span>
-          ${currentProduct.name ? `<div class="product-info-row"><span class="product-info-label">商品名称</span><span class="product-info-value">${_escHtml(currentProduct.name)}</span></div>` : ''}
-          ${currentProduct.price ? `<div class="product-info-row"><span class="product-info-label">商品价格</span><span class="product-info-value">${_escHtml(currentProduct.price)}</span></div>` : ''}
-          ${currentProduct.cycle ? `<div class="product-info-row"><span class="product-info-label">周期</span><span class="product-info-value">${_escHtml(currentProduct.cycle)}</span></div>` : ''}
-          ${pidLine}
-        `;
-      }
-
-      // 从当前页面 DOM / Vue 状态提取商品信息
-      function extractProductInfoFromPage() {
-        const tryText = (...sels) => {
-          for (const s of sels) {
-            try {
-              const el = document.querySelector(s);
-              if (el && el.textContent.trim()) return el.textContent.trim();
-            } catch (e) {}
-          }
-          return '';
-        };
-        const name = tryText(
-          '.goods-name', '.product-name', '.miaosha-name', '.item-name',
-          '[class*="goodsName"]', '[class*="goods-name"]',
-          '.detail-title', '.product-title', 'h1.title'
-        );
-        const price = tryText(
-          '.goods-price', '.price-num', '.sale-price', '.miaosha-price',
-          '[class*="goodsPrice"]', '[class*="salePrice"]', '.price'
-        );
-        const cycle = tryText(
-          '.goods-cycle', '.billing-cycle', '.miaosha-cycle',
-          '[class*="goodsCycle"]', '[class*="billingCycle"]', '.cycle'
-        );
-        return { name, price, cycle };
-      }
-
-      // 尝试从任意 JSON 响应体中提取商品信息
-      function tryExtractProductFromJson(jsonObj) {
-        if (!jsonObj) return false;
-        const search = (obj) => {
-          if (!obj || typeof obj !== 'object') return null;
-          // 直接字段
-          const name  = obj.goods_name  || obj.product_name || obj.title || obj.name;
-          const price = obj.goods_price || obj.sale_price   || obj.price || obj.amount;
-          const cycle = obj.goods_cycle || obj.billing_cycle || obj.cycle || obj.period;
-          if (name) return { name: String(name), price: price != null ? String(price) : '', cycle: cycle ? String(cycle) : '' };
-          // 递归搜索 data 子对象
-          for (const key of ['data', 'info', 'product', 'goods', 'item']) {
-            const res = search(obj[key]);
-            if (res) return res;
-          }
-          return null;
-        };
-        const found = search(jsonObj);
-        if (!found) return false;
-        currentProduct.name  = found.name;
-        // 价格格式化：若为纯数字则加 ¥
-        const p = found.price;
-        currentProduct.price = p ? (/^\d+(\.\d+)?$/.test(p) ? '¥' + parseFloat(p).toFixed(2) : p) : '';
-        currentProduct.cycle = found.cycle;
-        updateProductInfoUI();
-        saveCaptureState(true);
-        return true;
-      }
-
-      // ── 客户端成功回调（兼容旧版循环） ──────────────────────────────────────
       function onOrderSuccess(invId) {
         loopCount++;
         document.getElementById('loop-count').textContent = loopCount;
         updateStatus(`✔ 第 ${loopCount} 单成功: ${invId || 'OK'}`, 'ok');
+        
+        // 发送通知
         const token = localStorage.getItem(STORAGE_KEYS.QMSG);
         if (token) {
           const msg = `✅ 秒杀成功！\n⏰ ${new Date().toLocaleTimeString()}\n🔖 单号：${invId || 'N/A'}\n🔄 累计下单：${loopCount}`;
           originalFetch(`https://qmsg.zendee.cn/send/${token}`, {
             method: 'POST', body: 'msg=' + encodeURIComponent(msg),
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'}
           });
         }
+
         if (document.getElementById('auto-loop-toggle').checked) {
           isLooping = true;
           setModuleState('running');
@@ -1053,32 +437,19 @@
       function stopWorkflow(reason) {
         isLooping = false;
         setModuleState('idle');
-        updateStatus('⏹ 已停止: ' + (reason || '手动'));
-        const stopBtn = Array.from(document.querySelectorAll('button')).find(
-          b => b.innerText.includes('停止') && !b.id?.includes('stop-all') && !b.id?.includes('stop-loop')
-        );
+        updateStatus('⏹ 已停止: ' + (reason || '手动'), '');
+        const stopBtn = Array.from(document.querySelectorAll('button')).find(b => b.innerText.includes('停止') && !b.innerText.includes('循环'));
         if (stopBtn) stopBtn.click();
       }
 
-      // ── 标签切换 ─────────────────────────────────────────────────────────────
-      function initTabs() {
-        document.querySelectorAll('.v5-tab').forEach(tab => {
-          tab.addEventListener('click', () => {
-            document.querySelectorAll('.v5-tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.v5-pane').forEach(p => p.classList.remove('active'));
-            tab.classList.add('active');
-            document.getElementById('pane-' + tab.dataset.tab).classList.add('active');
-          });
-        });
-      }
-
-      // ── 面板注入 ─────────────────────────────────────────────────────────────
+      // 将面板注入 Vue 主内容区（等待 Vue 渲染完成）
       function injectPanelIntoMain() {
         const panel = document.getElementById('ai-v4-panel');
         if (!panel) return;
+        // 找到 Vue 渲染的主内容容器 (max-w-[800px] 或 space-y-4)
         const container =
           document.querySelector('[class*="max-w-\\[800px\\]"]') ||
-          document.querySelector('[class*="space-y-4"]')          ||
+          document.querySelector('[class*="space-y-4"]') ||
           document.querySelector('#app > div > div');
         if (container) {
           panel.style.display = '';
@@ -1088,174 +459,21 @@
         return false;
       }
 
-      // ── 服务器 API 辅助 ───────────────────────────────────────────────────────
-      async function apiGet(path) {
-        const r = await originalFetch(path);
-        return r.json();
-      }
-      async function apiPost(path, data) {
-        const r = await originalFetch(path, {
-          method:  'POST',
-          body:    JSON.stringify(data),
-          headers: { 'Content-Type': 'application/json' },
-        });
-        return r.json();
-      }
+      // 用 MutationObserver 等待 Vue 渲染
+      const _mo = new MutationObserver(() => {
+        if (injectPanelIntoMain()) _mo.disconnect();
+      });
+      _mo.observe(document.getElementById('app'), { childList: true, subtree: true });
 
-      // ── 任务列表渲染 ─────────────────────────────────────────────────────────
-      const STATUS_MAP = {
-        running: ['运行中', 'badge-running'],
-        stopped: ['已停止', 'badge-stopped'],
-        success: ['已成功', 'badge-success'],
-        error:   ['出错了', 'badge-error'],
-        timeout: ['已超时', 'badge-timeout'],
-        pending: ['准备中', 'badge-pending'],
-      };
-
-      function renderTaskList(tasks) {
-        const container = document.getElementById('task-list-container');
-        if (!container) return;
-        if (!tasks || !tasks.length) {
-          container.innerHTML = '<div id="task-list-empty">暂无任务 · 请先获取配置再开始抢购</div>';
-          setModuleState('idle');
-          updateStatus('系统就绪');
-          if (currentProduct.status === 'running') {
-            currentProduct.status = 'idle';
-            updateProductInfoUI();
-          }
-          return;
-        }
-        // 最新任务排前面
-        const sorted = [...tasks].sort((a, b) => (b.start_time || '').localeCompare(a.start_time || ''));
-        const runCount = sorted.filter(t => t.status === 'running').length;
-        setModuleState(runCount > 0 ? 'running' : 'idle');
-        updateStatus(runCount > 0 ? `🟢 运行中 ${runCount} 个任务` : '系统就绪', runCount > 0 ? 'ok' : '');
-        currentProduct.status = runCount > 0 ? 'running' : 'stopped';
-        updateProductInfoUI();
-
-        container.innerHTML = sorted.map(task => {
-          const [label, cls] = STATUS_MAP[task.status] || ['未知', 'badge-pending'];
-          const pidInfo = task.pid_count > 1
-            ? `<span style="font-size:10px;color:var(--primary);font-weight:600;white-space:nowrap;">🔄 PID ${task.current_pid}/${task.pid_count}</span>`
-            : '';
-          const resumedBadge = task.resumed === true
-            ? `<span class="task-resumed-badge">🔄 已恢复</span>`
-            : '';
-          const logs = (task.logs || []).slice(-8);
-          const logHtml = logs.map(l => `<div>${_escHtml(l)}</div>`).join('') || '<div style="opacity:0.4;">暂无日志</div>';
-          const stopBtn = task.status === 'running'
-            ? `<button class="btn-stop-task" data-task-id="${_escHtml(task.id)}">⏹ 停止</button>`
-            : '';
-          return `
-          <div class="task-card">
-            <div class="task-card-header">
-              <span class="task-badge ${cls}">${label}</span>
-              <span class="task-card-id">ID: ${_escHtml(task.id)}</span>
-              ${pidInfo}
-              ${resumedBadge}
-            </div>
-            <div class="task-card-stats">
-              ✅ 成功 <strong>${task.count || 0}</strong> 次 &nbsp;·&nbsp;
-              🔖 最近单号: <span style="font-family:monospace;">${_escHtml(task.last_order || 'N/A')}</span>
-              &nbsp;·&nbsp; ⏱ ${_escHtml(task.start_time || '')}
-            </div>
-            <div class="task-card-log">${logHtml}</div>
-            ${stopBtn ? `<div class="task-card-footer">${stopBtn}</div>` : ''}
-          </div>`;
-        }).join('');
-
-        // 绑定单个停止按钮
-        container.querySelectorAll('.btn-stop-task').forEach(btn => {
-          btn.addEventListener('click', async () => {
-            const tid = btn.getAttribute('data-task-id');
-            try {
-              btn.disabled = true; btn.textContent = '停止中...';
-              const res = await apiPost('/api/task/stop', { task_id: tid });
-              setTaskMsg(res.code === 1 ? `⏹ 任务 ${tid} 停止信号已发送` : ('❌ ' + res.msg), '');
-            } catch (e) {
-              setTaskMsg('❌ 通讯失败: ' + e.message, 'var(--danger)');
-            }
-          });
-        });
-      }
-
-      // ── 全量任务轮询（每 2 秒） ───────────────────────────────────────────────
-      function startGlobalPolling() {
-        if (pollTimer) clearInterval(pollTimer);
-        pollTimer = setInterval(async () => {
-          try {
-            const res = await apiGet('/api/task/status');
-            if (res.code === 1) renderTaskList(res.data);
-          } catch (e) {
-            console.warn('[APIhdy] 任务状态轮询失败:', e.message);
-          }
-        }, 2000);
-      }
-
-      // ── 设置 ─────────────────────────────────────────────────────────────────
-      async function loadSettingsToUI() {
-        try {
-          const res = await apiGet('/api/settings');
-          if (res.code !== 1) return;
-          const s = res.data;
-          const g = id => document.getElementById(id);
-          g('cfg-site-remark').value    = s.site_remark || '';
-          const tg = s.notify?.telegram || {};
-          g('cfg-tg-enabled').checked   = !!tg.enabled;
-          g('cfg-tg-token').value       = tg.bot_token || '';
-          g('cfg-tg-chatid').value      = tg.chat_id   || '';
-          const qq = s.notify?.qmsg || {};
-          g('cfg-qq-enabled').checked   = !!qq.enabled;
-          g('cfg-qq-token').value       = qq.token || '';
-          g('cfg-qq-qq').value          = qq.qq    || '';
-          const bk = s.notify?.bark || {};
-          g('cfg-bark-enabled').checked = !!bk.enabled;
-          g('cfg-bark-key').value       = bk.key    || '';
-          g('cfg-bark-server').value    = bk.server || 'https://api.day.app';
-          const ev = s.notify_events || {};
-          g('ev-start').checked   = ev.start   !== false;
-          g('ev-success').checked = ev.success !== false;
-          g('ev-error').checked   = ev.error   !== false;
-          g('ev-stop').checked    = ev.stop    !== false;
-          g('ev-timeout').checked = ev.timeout !== false;
-        } catch (e) {}
-      }
-
-      function collectSettings() {
-        const g = id => document.getElementById(id);
-        return {
-          site_remark: g('cfg-site-remark').value.trim(),
-          notify: {
-            telegram: { enabled: g('cfg-tg-enabled').checked, bot_token: g('cfg-tg-token').value.trim(), chat_id: g('cfg-tg-chatid').value.trim() },
-            qmsg:     { enabled: g('cfg-qq-enabled').checked, token: g('cfg-qq-token').value.trim(), qq: g('cfg-qq-qq').value.trim() },
-            bark:     { enabled: g('cfg-bark-enabled').checked, key: g('cfg-bark-key').value.trim(), server: g('cfg-bark-server').value.trim() || 'https://api.day.app' },
-          },
-          notify_events: {
-            start:   g('ev-start').checked,
-            success: g('ev-success').checked,
-            error:   g('ev-error').checked,
-            stop:    g('ev-stop').checked,
-            timeout: g('ev-timeout').checked,
-          },
-        };
-      }
-
-      // ── 主初始化 ─────────────────────────────────────────────────────────────
+      // 交互逻辑
       window.addEventListener('DOMContentLoaded', () => {
-        // 等待 Vue 渲染后注入面板
-        const panelObserver = new MutationObserver(() => {
-          if (injectPanelIntoMain()) panelObserver.disconnect();
-        });
-        panelObserver.observe(document.getElementById('app'), { childList: true, subtree: true });
-
-        initTabs();
-
-        // ── 账号 ──
         const accounts = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACCOUNTS) || '{}');
         const sel = document.getElementById('acc-list');
         const updateAccSelect = () => {
           sel.innerHTML = '<option value="">快速切换账号</option>';
-          Object.keys(accounts).forEach(u => sel.add(new Option(u, u)));
+          Object.keys(accounts).forEach(u => {
+            const op = new Option(u, u); sel.add(op);
+          });
         };
         updateAccSelect();
 
@@ -1281,14 +499,17 @@
           const u = document.getElementById('user').value.trim();
           const p = document.getElementById('pass').value.trim();
           if (!u || !p) return updateStatus('请输入完整信息', 'err');
+          
           updateStatus('正在通过原生代理验证...', 'ok');
-          const btn = document.getElementById('btn-login');
-          btn.disabled = true;
-          btn.innerHTML = '<div class="ai-loading-mini"></div> 验证中';
+          document.getElementById('btn-login').disabled = true;
+          document.getElementById('btn-login').innerHTML = '<div class="ai-loading-mini"></div> 验证中';
+
           try {
+            // 使用 v4.2 原生代理
             const r = await originalFetch('/local_proxy_login', {
-              method: 'POST', body: JSON.stringify({ username: u, password: p }),
-              headers: { 'Content-Type': 'application/json' },
+              method: 'POST', 
+              body: JSON.stringify({username: u, password: p}),
+              headers: {'Content-Type': 'application/json'}
             });
             const d = await r.json();
             if (d.status == 200 || d.status === '200') {
@@ -1296,197 +517,31 @@
               setTimeout(() => location.reload(), 1000);
             } else {
               updateStatus('❌ 登录失败: ' + (d.msg || '凭据错误'), 'err');
-              btn.disabled = false; btn.innerHTML = '快速登录';
+              document.getElementById('btn-login').disabled = false;
+              document.getElementById('btn-login').innerHTML = '快速登录';
             }
-          } catch (e) {
-            updateStatus('❌ 代理通讯失败: ' + e.message, 'err');
-            btn.disabled = false; btn.innerHTML = '快速登录';
+          } catch(e) { 
+            updateStatus('❌ 代理通讯失败: ' + e.message, 'err'); 
+            document.getElementById('btn-login').disabled = false;
+            document.getElementById('btn-login').innerHTML = '快速登录';
           }
         };
 
         document.getElementById('qmsg-token').value = localStorage.getItem(STORAGE_KEYS.QMSG) || '';
-        document.getElementById('qmsg-token').oninput = e => localStorage.setItem(STORAGE_KEYS.QMSG, e.target.value);
+        document.getElementById('qmsg-token').oninput = (e) => localStorage.setItem(STORAGE_KEYS.QMSG, e.target.value);
 
         const repeatToggle = document.getElementById('auto-loop-toggle');
-        repeatToggle.checked  = localStorage.getItem(STORAGE_KEYS.REPEAT) === 'true';
-        repeatToggle.onchange = e => localStorage.setItem(STORAGE_KEYS.REPEAT, e.target.checked);
+        repeatToggle.checked = localStorage.getItem(STORAGE_KEYS.REPEAT) === 'true';
+        repeatToggle.onchange = (e) => localStorage.setItem(STORAGE_KEYS.REPEAT, e.target.checked);
 
         document.getElementById('stop-loop-banner').onclick = () => stopWorkflow('用户手动拦截');
-        document.addEventListener('click', e => {
-          if (e.target.innerText?.includes('停止') && !e.target.id?.includes('stop-all') && !e.target.id?.includes('stop-loop')) {
+
+        // 检测原始停止按钮
+        document.addEventListener('click', (e) => {
+          if (e.target.innerText?.includes('停止') && !e.target.id?.includes('stop-loop')) {
             if (isLooping) stopWorkflow('外部系统干预');
           }
         });
-
-        // ── 获取配置 ──
-        document.getElementById('btn-get-config').onclick = () => {
-          // 先尝试从页面 DOM 提取商品信息
-          const info = extractProductInfoFromPage();
-          if (info.name) {
-            currentProduct.name  = info.name;
-            currentProduct.price = info.price;
-            currentProduct.cycle = info.cycle;
-            updateProductInfoUI();
-            saveCaptureState(true);
-            setTaskMsg('✅ 已从页面提取商品信息', 'var(--success)');
-            return;
-          }
-          // 尝试点击原始页面的「获取配置」按钮
-          const pageBtn = findPageActionButton(ACTION_TEXT.GET_CONFIG, 'btn-get-config');
-          if (pageBtn) {
-            pageBtn.click();
-            setTaskMsg('⏳ 正在从页面获取配置，请稍候...', '');
-          } else {
-            setTaskMsg('❌ 未找到商品信息，请先导航到秒杀商品页面', 'var(--danger)');
-          }
-        };
-
-        // ── 开始抢购 ──
-        document.getElementById('btn-server-start').onclick = async () => {
-          try {
-            await ensureCapturedRequests();
-            if (!capturedRequests.length) {
-              setTaskMsg('❌ 尚未捕获到抢购请求，请重新点击「获取配置」后再试', 'var(--danger)');
-              return;
-            }
-            await saveCaptureState(true);
-            const payload = {
-              configs:   capturedRequests.map(({ url, method, headers, body }) => ({ url, method, headers, body })),
-              interval:  parseFloat(document.getElementById('task-interval').value)  || 1,
-              max_count: parseInt(document.getElementById('task-max-count').value)    || 0,
-              timeout:   parseInt(document.getElementById('task-timeout').value)      || 0,
-              loop:      document.getElementById('task-loop').checked,
-            };
-            const res = await apiPost('/api/task/start', payload);
-            if (res.code === 1) {
-              currentProduct.status = 'running';
-              updateProductInfoUI();
-              setTaskMsg(`✅ 任务 ${res.task_id} 已在服务器启动，刷新页面也不会停止`, 'var(--success)');
-            } else {
-              setTaskMsg('❌ ' + (res.msg || '启动失败'), 'var(--danger)');
-            }
-          } catch (e) {
-            setTaskMsg('❌ ' + e.message, 'var(--danger)');
-          }
-        };
-
-        // ── 停止全部 ──
-        document.getElementById('btn-stop-all').onclick = async () => {
-          try {
-            const res = await apiPost('/api/task/stop', {});
-            setTaskMsg(res.code === 1 ? '⏹ 所有任务停止信号已发送' : ('❌ ' + res.msg), '');
-          } catch (e) {
-            setTaskMsg('❌ 通讯失败: ' + e.message, 'var(--danger)');
-          }
-        };
-
-        // ── 定时开始 ──
-        const scheduleRow = document.getElementById('scheduled-time-row');
-        const scheduleInput = document.getElementById('scheduled-time');
-
-        document.getElementById('btn-scheduled-start').onclick = () => {
-          if (scheduleRow.style.display === 'none') {
-            // 预填当前时间 + 1 分钟
-            const d = new Date(Date.now() + 60000);
-            const pad = n => String(n).padStart(2, '0');
-            scheduleInput.value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-            scheduleRow.style.display = '';
-          } else {
-            scheduleRow.style.display = 'none';
-            if (scheduledTimer) { clearTimeout(scheduledTimer); scheduledTimer = null; }
-            setTaskMsg('⏰ 定时已取消', '');
-          }
-        };
-
-        document.getElementById('btn-cancel-schedule').onclick = () => {
-          scheduleRow.style.display = 'none';
-          if (scheduledTimer) { clearTimeout(scheduledTimer); scheduledTimer = null; }
-          setTaskMsg('⏰ 定时已取消', '');
-        };
-
-        document.getElementById('btn-confirm-schedule').onclick = () => {
-          const val = scheduleInput.value;
-          if (!val) { setTaskMsg('❌ 请选择定时时间', 'var(--danger)'); return; }
-          const target = new Date(val).getTime();
-          const now = Date.now();
-          if (target - now < 3000) { setTaskMsg('❌ 时间必须晚于当前时间至少 3 秒', 'var(--danger)'); return; }
-          if (scheduledTimer) clearTimeout(scheduledTimer);
-          const delta = target - now;
-          const hms = new Date(target).toLocaleTimeString();
-          setTaskMsg(`⏰ 已定时：${hms} 自动开始抢购`, 'var(--primary)');
-          scheduleRow.style.display = 'none';
-          scheduledTimer = setTimeout(() => {
-            scheduledTimer = null;
-            document.getElementById('btn-server-start').click();
-          }, delta);
-        };
-
-        // ── 清除已完成任务 ──
-        document.getElementById('btn-clear-finished').onclick = async () => {
-          try {
-            const res = await apiPost('/api/task/clear', {});
-            if (res.code === 1) {
-              setTaskMsg(res.cleared > 0 ? `🗑 已清除 ${res.cleared} 个已完成任务` : '暂无可清除的任务', '');
-            }
-          } catch (e) {
-            setTaskMsg('❌ 通讯失败: ' + e.message, 'var(--danger)');
-          }
-        };
-
-        // ── 设置保存 & 测试 ──
-        document.getElementById('btn-save-settings').onclick = async () => {
-          const msg = document.getElementById('settings-msg');
-          try {
-            const res = await apiPost('/api/settings', collectSettings());
-            msg.textContent = res.code === 1 ? '✅ 设置已保存' : ('❌ ' + res.msg);
-            msg.style.color = res.code === 1 ? 'var(--success)' : 'var(--danger)';
-          } catch (e) {
-            msg.textContent = '❌ 保存失败: ' + e.message;
-            msg.style.color = 'var(--danger)';
-          }
-          setTimeout(() => { msg.textContent = ''; }, 3000);
-        };
-
-        document.getElementById('btn-test-notify').onclick = async () => {
-          const msg = document.getElementById('settings-msg');
-          msg.textContent = '发送测试通知中...';
-          try {
-            await apiPost('/api/settings', collectSettings());
-            const res = await apiPost('/api/task/start', {
-              url: 'https://httpbin.org/status/200', method: 'GET',
-              headers: {}, body: '', interval: 999, max_count: 1, timeout: 10, loop: false,
-            });
-            if (res.code === 1) {
-              msg.textContent = '✅ 已触发测试任务，请查看通知';
-              msg.style.color = 'var(--success)';
-            }
-          } catch (e) {
-            msg.textContent = '❌ 测试失败: ' + e.message;
-            msg.style.color = 'var(--danger)';
-          }
-          setTimeout(() => { msg.textContent = ''; }, 4000);
-        };
-
-        // 初始加载设置
-        loadSettingsToUI();
-
-        // 初始恢复已保存配置，再获取所有任务（含服务器自动恢复的任务）
-        (async () => {
-          try {
-            await loadCaptureState();
-            const res = await apiGet('/api/task/status');
-            if (res.code === 1 && Array.isArray(res.data)) {
-              renderTaskList(res.data);
-              const running = res.data.filter(t => t.status === 'running');
-              if (running.length) {
-                setTaskMsg(`🔄 已恢复监听 ${running.length} 个运行中任务`, 'var(--success)');
-              }
-            }
-          } catch (e) {
-            console.warn('[APIhdy] 初始任务加载失败:', e.message);
-          }
-          startGlobalPolling();
-        })();
 
         console.log('%c APIhdy V5 Supreme Loaded ', 'background: #06b6d4; color: #000; font-weight: bold;');
       });
