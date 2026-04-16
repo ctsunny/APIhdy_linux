@@ -371,6 +371,11 @@
       const MIN_INTERVAL_SECONDS = 0.2;
       const POLL_INTERVAL_MS = 2000;
       const PURCHASE_HANDOFF_TIMEOUT_MS = 8000;
+      const PURCHASE_REQUEST_KINDS = {
+        '/cart/add_to_shop': 'add_to_shop',
+        '/cart/add_promo': 'add_promo',
+        '/cart/settle': 'settle'
+      };
       const PANEL_BUTTON_IDS = new Set([
         'btn-start-server',
         'btn-stop-server',
@@ -484,9 +489,39 @@
         }
       }
 
-      function isPurchaseUrl(url) {
+      function getPurchaseRequestKind(url) {
         const normalized = normalizeTargetUrl(url);
-        return normalized.includes('/cart/settle');
+        if (!normalized) return '';
+        try {
+          const pathname = new URL(normalized).pathname;
+          return PURCHASE_REQUEST_KINDS[pathname] || '';
+        } catch (e) {
+          return '';
+        }
+      }
+
+      function isPurchaseUrl(url) {
+        return Boolean(getPurchaseRequestKind(url));
+      }
+
+      function cloneRequestConfig(config) {
+        if (!config || typeof config !== 'object') return null;
+        return {
+          ...config,
+          headers: { ...(config.headers || {}) }
+        };
+      }
+
+      function buildCartFlowFromConfigs(configs) {
+        if (!Array.isArray(configs) || !configs.length) return null;
+        const flow = {};
+        configs.forEach((config) => {
+          const kind = config && config.kind ? config.kind : getPurchaseRequestKind(config && config.url);
+          if (kind) {
+            flow[kind] = cloneRequestConfig({ ...config, kind });
+          }
+        });
+        return flow.add_to_shop ? flow : null;
       }
 
       function getProductSnapshot() {
@@ -639,11 +674,13 @@
 
       function capturePurchaseRequest(req) {
         if (!req || !isPurchaseUrl(req.url)) return;
+        const kind = getPurchaseRequestKind(req.url);
         const normalized = {
           url: normalizeTargetUrl(req.url),
           method: String(req.method || 'POST').toUpperCase(),
           headers: normalizeHeaders(req.headers),
-          body: normalizeBody(req.body)
+          body: normalizeBody(req.body),
+          kind
         };
         if (!normalized.url) return;
         const list = Array.isArray(captureState.configs) ? captureState.configs.slice() : [];
@@ -681,13 +718,20 @@
         const interval = getInputNumberValue('server-interval', 1);
         const maxCount = getInputNumberValue('server-max-count', 0);
         const timeout = getInputNumberValue('server-timeout', 0);
-        return {
-          configs: Array.isArray(configsOverride) ? configsOverride : (Array.isArray(captureState.configs) ? captureState.configs : []),
+        const configs = Array.isArray(configsOverride) ? configsOverride : (Array.isArray(captureState.configs) ? captureState.configs : []);
+        const payload = {
           interval: Math.max(MIN_INTERVAL_SECONDS, interval),
           max_count: Math.max(0, maxCount),
           timeout: Math.max(0, timeout),
           loop: document.getElementById('auto-loop-toggle').checked
         };
+        const flow = buildCartFlowFromConfigs(configs);
+        if (flow) {
+          payload.flow = flow;
+        } else {
+          payload.configs = configs;
+        }
+        return payload;
       }
 
       async function startServerTask(options = {}) {

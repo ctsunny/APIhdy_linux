@@ -59,6 +59,11 @@ DEFAULT_SETTINGS = {
 MAX_TASK_LOGS = 100
 MAX_CAPTURE_CONFIGS = 20
 VALID_PRODUCT_STATUSES = {'idle', 'running', 'stopped'}
+PURCHASE_REQUEST_PATHS = {
+    'add_to_shop': '/cart/add_to_shop',
+    'add_promo': '/cart/add_promo',
+    'settle': '/cart/settle',
+}
 
 
 def load_settings():
@@ -178,6 +183,108 @@ def save_capture_state(data):
     state = _normalize_capture_state(data or {})
     with open(CAPTURE_STATE_PATH, 'w', encoding='utf-8') as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
+
+
+def _request_kind_from_url(url: str) -> str:
+    try:
+        path = urllib.parse.urlsplit(str(url or '').strip()).path
+    except Exception:
+        return ''
+    for kind, expected in PURCHASE_REQUEST_PATHS.items():
+        if path == expected:
+            return kind
+    return ''
+
+
+def _normalize_request_config(config: dict) -> dict:
+    if not isinstance(config, dict):
+        return {}
+    headers_in = config.get('headers', {})
+    headers = {}
+    if isinstance(headers_in, dict):
+        headers = {
+            str(k): '' if v is None else str(v)
+            for k, v in headers_in.items()
+        }
+    url = str(config.get('url', '')).strip()
+    body = config.get('body', '')
+    if body is None:
+        body = ''
+    elif not isinstance(body, (str, bytes)):
+        body = str(body)
+    return {
+        'url': url,
+        'method': str(config.get('method', 'POST')).upper().strip() or 'POST',
+        'headers': headers,
+        'body': body,
+        'kind': str(config.get('kind') or _request_kind_from_url(url)).strip(),
+    }
+
+
+def _request_succeeded(resp_json: dict) -> bool:
+    if not isinstance(resp_json, dict):
+        return False
+    status = resp_json.get('status')
+    if status not in (None, ''):
+        return str(status) == '200'
+    code = resp_json.get('code')
+    if code not in (None, ''):
+        return str(code) in {'1', '200'}
+    return False
+
+
+def _response_message(resp_json: dict) -> str:
+    if not isinstance(resp_json, dict):
+        return ''
+    return str(
+        resp_json.get('msg')
+        or resp_json.get('message')
+        or resp_json.get('status')
+        or resp_json.get('code')
+        or ''
+    ).strip()
+
+
+def _response_invoice_id(resp_json: dict) -> str:
+    if not isinstance(resp_json, dict):
+        return ''
+    data = resp_json.get('data')
+    if isinstance(data, dict):
+        return str(data.get('invoiceid', '')).strip()
+    return ''
+
+
+def _derive_settle_config(add_to_shop_cfg: dict) -> dict:
+    add_cfg = _normalize_request_config(add_to_shop_cfg)
+    if not add_cfg.get('url'):
+        return {}
+    parts = urllib.parse.urlsplit(add_cfg['url'])
+    url = urllib.parse.urlunsplit((
+        parts.scheme,
+        parts.netloc,
+        PURCHASE_REQUEST_PATHS['settle'],
+        '',
+        ''
+    ))
+    headers = dict(add_cfg.get('headers', {}))
+    content_type = ''
+    for key, value in headers.items():
+        if str(key).lower() == 'content-type':
+            content_type = str(value).lower()
+            break
+    if 'application/x-www-form-urlencoded' in content_type:
+        body = urllib.parse.urlencode([('payment', ''), ('pos[]', 0), ('checkout', 0)])
+    else:
+        if not content_type:
+            headers['Content-Type'] = 'application/json;charset=UTF-8'
+        body = json.dumps({'payment': '', 'pos[]': 0, 'checkout': 0}, ensure_ascii=False)
+    return {
+        'url': url,
+        'method': 'POST',
+        'headers': headers,
+        'body': body,
+        'kind': 'settle',
+    }
 
 
 # ── 通知 ──────────────────────────────────────────────────────────────────────
@@ -392,10 +499,48 @@ class TaskManager:
         task['logs'] = task['logs'][-MAX_TASK_LOGS:]
         print(f'[Task {task["id"]}] {msg}', flush=True)
 
+    @staticmethod
+    def _build_cart_flow(task_cfg: dict) -> dict:
+        flow_in = task_cfg.get('flow')
+        if not isinstance(flow_in, dict):
+            return {}
+        flow = {}
+        for key in ('add_to_shop', 'add_promo', 'settle'):
+            normalized = _normalize_request_config(flow_in.get(key, {}))
+            if normalized.get('url'):
+                flow[key] = normalized
+        if flow.get('add_to_shop') and not flow.get('settle'):
+            flow['settle'] = _derive_settle_config(flow['add_to_shop'])
+        return flow if flow.get('add_to_shop') and flow.get('settle') else {}
+
+    @staticmethod
+    def _execute_request(config: dict) -> dict:
+        body = config.get('body', '')
+        if isinstance(body, bytes):
+            body_bytes = body
+        elif isinstance(body, str):
+            body_bytes = body.encode('utf-8')
+        else:
+            body_bytes = b''
+        req = urllib.request.Request(
+            url=config['url'],
+            data=body_bytes if config.get('method', 'POST') != 'GET' else None,
+            method=config.get('method', 'POST'),
+            headers=dict(config.get('headers', {})),
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read()
+        try:
+            return json.loads(raw)
+        except Exception:
+            text = raw.decode('utf-8', errors='replace')
+            return {'status': 200 if text else 0, 'msg': text}
+
     def _run(self, task_id: str):
         with self._lock:
             task = self._tasks[task_id]
         cfg = task['_cfg']
+        cart_flow = self._build_cart_flow(cfg)
 
         # 支持多PID轮换：优先使用 configs 列表，兼容单URL旧格式
         raw_configs = cfg.get('configs')
@@ -423,12 +568,14 @@ class TaskManager:
         do_loop   = bool(cfg.get('loop', True))
         multi_pid = len(configs) > 1
 
-        if not any(c['url'] for c in configs):
+        if not cart_flow and not any(c['url'] for c in configs):
             self._log(task, '❌ 任务 URL 为空，无法启动')
             task['status'] = 'error'
             return
 
-        if multi_pid:
+        if cart_flow:
+            self._log(task, '🛒 购物车抢购模式：服务器将自动执行加购后结算')
+        elif multi_pid:
             self._log(task, f'🔄 多PID模式：共 {len(configs)} 个PID，顺序轮换')
 
         send_notification('start', task)
@@ -452,6 +599,59 @@ class TaskManager:
                 send_notification('stop', task)
                 self._save()
                 return
+
+            if cart_flow:
+                try:
+                    skip_settle = False
+                    add_resp = self._execute_request(cart_flow['add_to_shop'])
+                    if _request_succeeded(add_resp):
+                        self._log(task, '🛒 添加购物车成功，开始结算')
+                        promo_cfg = cart_flow.get('add_promo')
+                        if promo_cfg:
+                            promo_resp = self._execute_request(promo_cfg)
+                            if _request_succeeded(promo_resp):
+                                self._log(task, '🏷️ 优惠码应用成功')
+                            else:
+                                # 与前端原流程保持一致：优惠码失败时本轮不继续结算，直接等待下一轮重试。
+                                self._log(task, f'❌ 优惠码失败: {_response_message(promo_resp) or "未知错误"}')
+                                skip_settle = True
+                        if not skip_settle:
+                            settle_resp = self._execute_request(cart_flow['settle'])
+                            if _request_succeeded(settle_resp):
+                                order_id = _response_invoice_id(settle_resp)
+                                task['count'] += 1
+                                task['last_order'] = order_id
+                                self._log(task, f'✅ 成功 #{task["count"]}  单号:{order_id or "N/A"}')
+                                send_notification('success', task, {'order_id': order_id})
+                                self._save()
+                                if not do_loop:
+                                    task['status'] = 'success'
+                                    self._save()
+                                    return
+                            else:
+                                self._log(task, f'❌ 结算失败: {_response_message(settle_resp) or "未知错误"}')
+                    else:
+                        self._log(task, f'❌ 添加购物车失败: {_response_message(add_resp) or "未知错误"}')
+
+                except urllib.error.HTTPError as e:
+                    self._log(task, f'HTTP {e.code}: {e.reason}')
+                    task['status'] = 'error'
+                    if e.code in (401, 403):
+                        send_notification('error', task, {'msg': f'认证失败 HTTP {e.code}'})
+                    else:
+                        send_notification('error', task, {'msg': f'HTTP {e.code}'})
+                    self._save()
+                    return
+
+                except Exception as e:
+                    self._log(task, f'❌ 错误: {e}')
+                    task['status'] = 'error'
+                    send_notification('error', task, {'msg': str(e)})
+                    self._save()
+                    return
+
+                time.sleep(interval)
+                continue
 
             # 多PID轮换：按序选取当前配置
             current_idx = cfg_index % len(configs)
@@ -699,7 +899,12 @@ class APIhdyHandler(SimpleHTTPRequestHandler):
             self._send_json({'code': 1, 'msg': '配置已保存', 'data': load_capture_state()})
 
         elif endpoint == 'start':
-            has_url = bool(payload.get('url')) or (
+            flow = payload.get('flow') if isinstance(payload.get('flow'), dict) else {}
+            has_flow = any(
+                isinstance(flow.get(key), dict) and flow.get(key, {}).get('url')
+                for key in ('add_to_shop', 'add_promo', 'settle')
+            )
+            has_url = has_flow or bool(payload.get('url')) or (
                 bool(payload.get('configs')) and
                 any(c.get('url') for c in payload.get('configs', []))
             )
