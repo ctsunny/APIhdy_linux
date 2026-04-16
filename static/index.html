@@ -370,7 +370,7 @@
       const MAX_STORED_CONFIGS = 20;
       const MIN_INTERVAL_SECONDS = 0.2;
       const POLL_INTERVAL_MS = 2000;
-      const ORIGINAL_REQUEST_TIMEOUT_MS = 8000;
+      const PURCHASE_HANDOFF_TIMEOUT_MS = 8000;
       const PANEL_BUTTON_IDS = new Set([
         'btn-start-server',
         'btn-stop-server',
@@ -741,7 +741,7 @@
           if (!pendingOriginalStart) return;
           pendingOriginalStart = false;
           updateStatus('未捕获到“原始抢购”请求，请重新点击“开始抢购”', 'err');
-        }, ORIGINAL_REQUEST_TIMEOUT_MS);
+        }, PURCHASE_HANDOFF_TIMEOUT_MS);
         updateStatus('已接管原始抢购，正在同步到服务器...', 'ok');
       }
 
@@ -995,7 +995,7 @@
             updateStatus('停止失败: ' + e.message, 'err');
           }
         };
-        document.addEventListener('click', (event) => {
+        document.getElementById('app').addEventListener('click', (event) => {
           const button = event.target && typeof event.target.closest === 'function'
             ? event.target.closest('button')
             : null;
