@@ -612,6 +612,7 @@ class TaskManager:
                             if _request_succeeded(promo_resp):
                                 self._log(task, '🏷️ 优惠码应用成功')
                             else:
+                                # 与前端原流程保持一致：优惠码失败时本轮不继续结算，直接等待下一轮重试。
                                 self._log(task, f'❌ 优惠码失败: {_response_message(promo_resp) or "未知错误"}')
                                 skip_settle = True
                         if not skip_settle:
