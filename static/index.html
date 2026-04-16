@@ -713,7 +713,7 @@
         pendingOriginalStartTimer = setTimeout(() => {
           if (!pendingOriginalStart) return;
           pendingOriginalStart = false;
-          updateStatus('未捕获到原始抢购请求，请重新点击“开始抢购”', 'err');
+          updateStatus('未捕获到“原始抢购”请求，请重新点击“开始抢购”', 'err');
         }, 8000);
         updateStatus('已接管原始抢购，正在同步到服务器...', 'ok');
       }
@@ -725,7 +725,7 @@
         try {
           await startServerTask({ configs: [config], source: 'original' });
         } catch (e) {
-          updateStatus('原始抢购转服务器失败: ' + e.message, 'err');
+          updateStatus('原始抢购转服务器失败：' + e.message, 'err');
         } finally {
           originalAutoStarting = false;
         }
