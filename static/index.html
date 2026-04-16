@@ -440,6 +440,55 @@
         color: var(--text-muted);
         padding: 12px 0;
       }
+
+      /* ── 商品信息卡片 ── */
+      .product-info-card {
+        background: rgba(241,245,249,0.8);
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+      }
+      .product-status-badge {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 10px;
+        border-radius: 12px;
+        margin-bottom: 7px;
+      }
+      .product-status-running {
+        background: rgba(16,185,129,0.15);
+        color: #10b981;
+      }
+      .product-status-stopped {
+        background: rgba(239,68,68,0.12);
+        color: #ef4444;
+      }
+      .product-status-idle {
+        background: rgba(100,116,139,0.12);
+        color: #64748b;
+      }
+      .product-info-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 4px 0;
+        font-size: 12px;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+      }
+      .product-info-row:last-child { border-bottom: none; }
+      .product-info-label {
+        color: var(--text-muted);
+        font-size: 11px;
+        min-width: 56px;
+      }
+      .product-info-value {
+        color: var(--text-main);
+        font-weight: 600;
+        font-size: 12px;
+        text-align: right;
+      }
     </style>
 
     <!-- ── 极速秒杀控制面板（由 JS 注入主内容区） ──────────────────────────── -->
@@ -507,14 +556,31 @@
           🟢 任务运行于服务器端 · 关闭浏览器 / 重启服务均自动恢复
         </div>
 
-        <!-- PID 捕获列表 -->
+        <!-- 商品信息 -->
         <div class="ai-section">
-          <span class="ai-label">多PID列表 📡 <span style="font-weight:400;font-size:9px;text-transform:none;">(在秒杀页面对每个商品点击"开始抢购"即可自动捕获)</span></span>
-          <div id="captured-info" style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">
-            尚未捕获——请先在秒杀页面点击"开始抢购"触发一次请求
+          <span class="ai-label">商品信息 🛒</span>
+          <div id="product-info-card" class="product-info-card">
+            <div style="font-size:11px;color:var(--text-muted);text-align:center;padding:4px 0;">
+              请点击「获取配置」获取商品信息，或在秒杀页面点击「开始抢购」自动捕获
+            </div>
+          </div>
+          <div class="ai-input-group">
+            <button id="btn-get-config" class="ai-btn btn-ghost" style="font-size:11px;">📋 获取配置</button>
+            <button id="btn-server-start" class="ai-btn btn-primary">🚀 开始抢购</button>
           </div>
           <div class="ai-input-group" style="margin-bottom:0;">
-            <button id="btn-task-capture-clear" class="ai-btn btn-ghost" style="font-size:11px;">清除全部 PID</button>
+            <button id="btn-scheduled-start" class="ai-btn btn-ghost" style="font-size:11px;">⏰ 定时开始</button>
+            <button id="btn-stop-all" class="ai-btn btn-danger">⏹ 停止全部</button>
+          </div>
+          <div id="scheduled-time-row" style="display:none;margin-top:8px;">
+            <div class="settings-row">
+              <span class="settings-label" style="white-space:nowrap;">开始时间</span>
+              <input type="datetime-local" id="scheduled-time" class="ai-input-sm" style="flex:1;">
+            </div>
+            <div class="ai-input-group" style="margin-bottom:0;">
+              <button id="btn-confirm-schedule" class="ai-btn btn-primary" style="font-size:11px;">✅ 确认定时</button>
+              <button id="btn-cancel-schedule" class="ai-btn btn-ghost" style="font-size:11px;">取消</button>
+            </div>
           </div>
         </div>
 
@@ -539,11 +605,6 @@
           </div>
         </div>
 
-        <!-- 操作按钮 -->
-        <div class="ai-input-group">
-          <button id="btn-server-start" class="ai-btn btn-primary">🚀 启动任务</button>
-          <button id="btn-stop-all" class="ai-btn btn-danger">⏹ 停止全部</button>
-        </div>
         <div id="task-msg" style="font-size:11px;text-align:center;margin-top:6px;margin-bottom:8px;color:var(--text-muted);min-height:16px;"></div>
 
         <!-- 任务列表 -->
@@ -552,7 +613,7 @@
             <span class="ai-label" style="margin-bottom:0;">任务列表 📋</span>
             <button id="btn-clear-finished" class="ai-btn btn-ghost" style="font-size:10px;padding:4px 10px;flex:none;">清除已完成</button>
           </div>
-          <div id="task-list-container"><div id="task-list-empty">暂无任务 · 请捕获请求后点击启动</div></div>
+          <div id="task-list-container"><div id="task-list-empty">暂无任务 · 请获取配置后点击启动</div></div>
         </div>
       </div>
 
@@ -646,6 +707,8 @@
       let isLooping        = false;
       let pollTimer        = null;
       let capturedRequests = [];   // 多PID列表，每项为一个捕获的请求
+      let currentProduct   = { name: '', price: '', cycle: '', status: 'idle' };
+      let scheduledTimer   = null;
 
       const STORAGE_KEYS = {
         ACCOUNTS: 'ai_accounts',
@@ -730,7 +793,7 @@
               body:    _body,
               _key:    _key,
             });
-            updateCapturedUI();
+            updateProductInfoUI();
           }
           this.addEventListener('load', () => {
             try {
@@ -741,29 +804,100 @@
             } catch (e) {}
           });
         }
+        // 拦截所有 JSON 响应，尝试提取商品信息（配置类接口）
+        if (this._url && !this._url.includes('/cart/settle')) {
+          this.addEventListener('load', () => {
+            if (!currentProduct.name) {
+              try {
+                const res = JSON.parse(this.responseText);
+                tryExtractProductFromJson(res);
+              } catch (e) {}
+            }
+          });
+        }
         return oSend.apply(this, arguments);
       };
 
-      function updateCapturedUI() {
-        const el = document.getElementById('captured-info');
-        if (!el) return;
-        if (!capturedRequests.length) {
-          el.innerHTML = '尚未捕获——请先在秒杀页面点击"开始抢购"触发一次请求';
+      function updateProductInfoUI() {
+        const card = document.getElementById('product-info-card');
+        if (!card) return;
+        if (!currentProduct.name && !capturedRequests.length) {
+          card.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:4px 0;">请点击「获取配置」获取商品信息，或在秒杀页面点击「开始抢购」自动捕获</div>';
           return;
         }
-        el.innerHTML = capturedRequests.map((r, i) =>
-          `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">` +
-          `<span style="color:var(--success);font-weight:700;font-size:10px;white-space:nowrap;">PID ${i + 1}</span>` +
-          `<code style="font-size:10px;word-break:break-all;flex:1;overflow:hidden;">${_escHtml(r.url)}</code>` +
-          `<button data-pid-idx="${i}" class="v5-pid-del" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:13px;padding:0 4px;flex-shrink:0;line-height:1;">✕</button>` +
-          `</div>`
-        ).join('') + `<div style="font-size:10px;color:var(--text-muted);margin-top:2px;">共 ${capturedRequests.length} 个PID，服务器顺序轮换抢购</div>`;
-        el.querySelectorAll('.v5-pid-del').forEach(btn => {
-          btn.addEventListener('click', () => {
-            capturedRequests.splice(parseInt(btn.getAttribute('data-pid-idx'), 10), 1);
-            updateCapturedUI();
-          });
-        });
+        const st = currentProduct.status;
+        const [stLabel, stCls] = st === 'running'
+          ? ['运行中', 'product-status-running']
+          : st === 'idle' && capturedRequests.length
+            ? ['已捕获', 'product-status-idle']
+            : ['已停止', 'product-status-stopped'];
+        const pidLine = capturedRequests.length > 1
+          ? `<div class="product-info-row"><span class="product-info-label">已捕获</span><span class="product-info-value" style="color:var(--primary);">${capturedRequests.length} 个配置</span></div>`
+          : capturedRequests.length === 1
+            ? `<div class="product-info-row"><span class="product-info-label">已捕获</span><span class="product-info-value" style="color:var(--success);">✔ 1 个配置</span></div>`
+            : '';
+        card.innerHTML = `
+          <span class="product-status-badge ${stCls}">● ${stLabel}</span>
+          ${currentProduct.name ? `<div class="product-info-row"><span class="product-info-label">商品名称</span><span class="product-info-value">${_escHtml(currentProduct.name)}</span></div>` : ''}
+          ${currentProduct.price ? `<div class="product-info-row"><span class="product-info-label">商品价格</span><span class="product-info-value">${_escHtml(currentProduct.price)}</span></div>` : ''}
+          ${currentProduct.cycle ? `<div class="product-info-row"><span class="product-info-label">周期</span><span class="product-info-value">${_escHtml(currentProduct.cycle)}</span></div>` : ''}
+          ${pidLine}
+        `;
+      }
+
+      // 从当前页面 DOM / Vue 状态提取商品信息
+      function extractProductInfoFromPage() {
+        const tryText = (...sels) => {
+          for (const s of sels) {
+            try {
+              const el = document.querySelector(s);
+              if (el && el.textContent.trim()) return el.textContent.trim();
+            } catch (e) {}
+          }
+          return '';
+        };
+        const name = tryText(
+          '.goods-name', '.product-name', '.miaosha-name', '.item-name',
+          '[class*="goodsName"]', '[class*="goods-name"]',
+          '.detail-title', '.product-title', 'h1.title'
+        );
+        const price = tryText(
+          '.goods-price', '.price-num', '.sale-price', '.miaosha-price',
+          '[class*="goodsPrice"]', '[class*="salePrice"]', '.price'
+        );
+        const cycle = tryText(
+          '.goods-cycle', '.billing-cycle', '.miaosha-cycle',
+          '[class*="goodsCycle"]', '[class*="billingCycle"]', '.cycle'
+        );
+        return { name, price, cycle };
+      }
+
+      // 尝试从任意 JSON 响应体中提取商品信息
+      function tryExtractProductFromJson(jsonObj) {
+        if (!jsonObj) return false;
+        const search = (obj) => {
+          if (!obj || typeof obj !== 'object') return null;
+          // 直接字段
+          const name  = obj.goods_name  || obj.product_name || obj.title || obj.name;
+          const price = obj.goods_price || obj.sale_price   || obj.price || obj.amount;
+          const cycle = obj.goods_cycle || obj.billing_cycle || obj.cycle || obj.period;
+          if (name) return { name: String(name), price: price != null ? String(price) : '', cycle: cycle ? String(cycle) : '' };
+          // 递归搜索 data 子对象
+          for (const key of ['data', 'info', 'product', 'goods', 'item']) {
+            const res = search(obj[key]);
+            if (res) return res;
+          }
+          return null;
+        };
+        const found = search(jsonObj);
+        if (!found) return false;
+        currentProduct.name  = found.name;
+        // 价格格式化：若为纯数字则加 ¥
+        const p = found.price;
+        currentProduct.price = p ? (/^\d+(\.\d+)?$/.test(p) ? '¥' + parseFloat(p).toFixed(2) : p) : '';
+        currentProduct.cycle = found.cycle;
+        updateProductInfoUI();
+        return true;
       }
 
       // ── 客户端成功回调（兼容旧版循环） ──────────────────────────────────────
@@ -867,6 +1001,8 @@
         const runCount = sorted.filter(t => t.status === 'running').length;
         setModuleState(runCount > 0 ? 'running' : 'idle');
         updateStatus(runCount > 0 ? `🟢 运行中 ${runCount} 个任务` : '系统就绪', runCount > 0 ? 'ok' : '');
+        currentProduct.status = runCount > 0 ? 'running' : 'stopped';
+        updateProductInfoUI();
 
         container.innerHTML = sorted.map(task => {
           const [label, cls] = STATUS_MAP[task.status] || ['未知', 'badge-pending'];
@@ -1053,16 +1189,35 @@
           }
         });
 
-        // ── PID 捕获 ──
-        document.getElementById('btn-task-capture-clear').onclick = () => {
-          capturedRequests = [];
-          updateCapturedUI();
+        // ── 获取配置 ──
+        document.getElementById('btn-get-config').onclick = () => {
+          // 先尝试从页面 DOM 提取商品信息
+          const info = extractProductInfoFromPage();
+          if (info.name) {
+            currentProduct.name  = info.name;
+            currentProduct.price = info.price;
+            currentProduct.cycle = info.cycle;
+            updateProductInfoUI();
+            setTaskMsg('✅ 已从页面提取商品信息', 'var(--success)');
+            return;
+          }
+          // 尝试点击原始页面的「获取配置」按钮
+          const pageBtn = Array.from(document.querySelectorAll('button')).find(b =>
+            b.id !== 'btn-get-config' &&
+            (b.innerText?.includes('获取配置') || b.textContent?.includes('获取配置'))
+          );
+          if (pageBtn) {
+            pageBtn.click();
+            setTaskMsg('⏳ 正在从页面获取配置，请稍候...', '');
+          } else {
+            setTaskMsg('❌ 未找到商品信息，请先导航到秒杀商品页面', 'var(--danger)');
+          }
         };
 
-        // ── 启动任务 ──
+        // ── 开始抢购 ──
         document.getElementById('btn-server-start').onclick = async () => {
           if (!capturedRequests.length) {
-            setTaskMsg('❌ 尚未捕获请求，请先触发一次抢购操作', 'var(--danger)');
+            setTaskMsg('❌ 尚未捕获请求，请先点击「获取配置」或在商品页面触发一次抢购', 'var(--danger)');
             return;
           }
           const payload = {
@@ -1092,6 +1247,47 @@
           } catch (e) {
             setTaskMsg('❌ 通讯失败: ' + e.message, 'var(--danger)');
           }
+        };
+
+        // ── 定时开始 ──
+        const scheduleRow = document.getElementById('scheduled-time-row');
+        const scheduleInput = document.getElementById('scheduled-time');
+
+        document.getElementById('btn-scheduled-start').onclick = () => {
+          if (scheduleRow.style.display === 'none') {
+            // 预填当前时间 + 1 分钟
+            const d = new Date(Date.now() + 60000);
+            const pad = n => String(n).padStart(2, '0');
+            scheduleInput.value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            scheduleRow.style.display = '';
+          } else {
+            scheduleRow.style.display = 'none';
+            if (scheduledTimer) { clearTimeout(scheduledTimer); scheduledTimer = null; }
+            setTaskMsg('⏰ 定时已取消', '');
+          }
+        };
+
+        document.getElementById('btn-cancel-schedule').onclick = () => {
+          scheduleRow.style.display = 'none';
+          if (scheduledTimer) { clearTimeout(scheduledTimer); scheduledTimer = null; }
+          setTaskMsg('⏰ 定时已取消', '');
+        };
+
+        document.getElementById('btn-confirm-schedule').onclick = () => {
+          const val = scheduleInput.value;
+          if (!val) { setTaskMsg('❌ 请选择定时时间', 'var(--danger)'); return; }
+          const target = new Date(val).getTime();
+          const now = Date.now();
+          if (target <= now) { setTaskMsg('❌ 时间必须晚于当前时间', 'var(--danger)'); return; }
+          if (scheduledTimer) clearTimeout(scheduledTimer);
+          const delta = target - now;
+          const hms = new Date(target).toLocaleTimeString();
+          setTaskMsg(`⏰ 已定时：${hms} 自动开始抢购`, 'var(--primary)');
+          scheduleRow.style.display = 'none';
+          scheduledTimer = setTimeout(() => {
+            scheduledTimer = null;
+            document.getElementById('btn-server-start').click();
+          }, delta);
         };
 
         // ── 清除已完成任务 ──
